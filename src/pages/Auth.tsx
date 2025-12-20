@@ -38,7 +38,14 @@ export default function Auth() {
 
   useEffect(() => {
     if (user) {
-      navigate('/');
+      // Check for redirect after auth
+      const redirectUrl = sessionStorage.getItem('redirectAfterAuth');
+      if (redirectUrl) {
+        sessionStorage.removeItem('redirectAfterAuth');
+        navigate(redirectUrl);
+      } else {
+        navigate('/');
+      }
     }
   }, [user, navigate]);
 

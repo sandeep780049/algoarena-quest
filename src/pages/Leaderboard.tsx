@@ -46,25 +46,35 @@ export default function Leaderboard() {
   const fetchLeaderboard = async (contestId: string) => {
     setLoading(true);
     try {
-      const { data } = await supabase
+      // Fetch results
+      const { data: resultsData } = await supabase
         .from('contest_results')
-        .select(`
-          *,
-          profiles:user_id (*)
-        `)
+        .select('*')
         .eq('contest_id', contestId)
         .not('completed_at', 'is', null)
         .order('score', { ascending: false })
         .order('time_taken_seconds', { ascending: true })
         .limit(100);
 
-      if (data) {
-        const ranked = data.map((entry: any, idx: number) => ({
+      if (resultsData && resultsData.length > 0) {
+        // Fetch profiles separately
+        const userIds = resultsData.map(r => r.user_id);
+        const { data: profilesData } = await supabase
+          .from('profiles')
+          .select('*')
+          .in('id', userIds);
+
+        const profileMap: Record<string, any> = {};
+        profilesData?.forEach(p => { profileMap[p.id] = p; });
+
+        const ranked = resultsData.map((entry: any, idx: number) => ({
           ...entry,
-          profile: entry.profiles,
+          profile: profileMap[entry.user_id],
           rank: idx + 1,
         }));
         setEntries(ranked);
+      } else {
+        setEntries([]);
       }
     } catch (error) {
       console.error('Error fetching leaderboard:', error);
@@ -76,38 +86,40 @@ export default function Leaderboard() {
   const fetchGlobalLeaderboard = async () => {
     setLoading(true);
     try {
-      // For global, aggregate scores across all contests
-      const { data } = await supabase
+      // Fetch all completed results
+      const { data: resultsData } = await supabase
         .from('contest_results')
-        .select(`
-          user_id,
-          score,
-          profiles:user_id (*)
-        `)
+        .select('user_id, score')
         .not('completed_at', 'is', null);
 
-      if (data) {
+      if (resultsData && resultsData.length > 0) {
         // Aggregate by user
-        const userScores: Record<string, { total: number; count: number; profile: any }> = {};
+        const userScores: Record<string, { total: number; count: number }> = {};
         
-        data.forEach((entry: any) => {
+        resultsData.forEach((entry: any) => {
           if (!userScores[entry.user_id]) {
-            userScores[entry.user_id] = {
-              total: 0,
-              count: 0,
-              profile: entry.profiles,
-            };
+            userScores[entry.user_id] = { total: 0, count: 0 };
           }
           userScores[entry.user_id].total += entry.score || 0;
           userScores[entry.user_id].count += 1;
         });
+
+        // Fetch profiles
+        const userIds = Object.keys(userScores);
+        const { data: profilesData } = await supabase
+          .from('profiles')
+          .select('*')
+          .in('id', userIds);
+
+        const profileMap: Record<string, any> = {};
+        profilesData?.forEach(p => { profileMap[p.id] = p; });
 
         const sorted = Object.entries(userScores)
           .map(([userId, data]) => ({
             user_id: userId,
             score: data.total,
             total_questions: data.count,
-            profile: data.profile,
+            profile: profileMap[userId],
           }))
           .sort((a, b) => b.score - a.score)
           .slice(0, 100)
@@ -117,6 +129,8 @@ export default function Leaderboard() {
           }));
 
         setEntries(sorted as any);
+      } else {
+        setEntries([]);
       }
     } catch (error) {
       console.error('Error fetching global leaderboard:', error);
