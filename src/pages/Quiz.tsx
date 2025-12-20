@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/lib/supabase';
@@ -7,16 +7,23 @@ import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import type { Contest, Question } from '@/lib/supabase';
 import { 
-  Clock, 
   ChevronLeft, 
   ChevronRight,
   AlertCircle,
-  CheckCircle,
   Timer,
   Flag,
-  Send
+  Trophy,
+  CheckCircle,
+  XCircle
 } from 'lucide-react';
 import { addMinutes, differenceInSeconds } from 'date-fns';
+
+interface QuizResult {
+  score: number;
+  totalQuestions: number;
+  percentage: number;
+  timeTaken: number;
+}
 
 export default function Quiz() {
   const { id } = useParams<{ id: string }>();
@@ -32,9 +39,13 @@ export default function Quiz() {
   const [submitting, setSubmitting] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState(0);
   const [startedAt, setStartedAt] = useState<Date | null>(null);
+  const [quizResult, setQuizResult] = useState<QuizResult | null>(null);
+  const [hasCompleted, setHasCompleted] = useState(false);
 
   useEffect(() => {
     if (!user) {
+      // Store intended destination for redirect after login
+      sessionStorage.setItem('redirectAfterAuth', `/quiz/${id}`);
       navigate('/auth');
       return;
     }
@@ -44,7 +55,7 @@ export default function Quiz() {
   }, [id, user]);
 
   useEffect(() => {
-    if (!contest || !startedAt) return;
+    if (!contest || !startedAt || hasCompleted || quizResult) return;
     
     const endTime = addMinutes(new Date(contest.start_time), contest.duration_minutes);
     
@@ -63,7 +74,7 @@ export default function Quiz() {
     updateTimer();
     const interval = setInterval(updateTimer, 1000);
     return () => clearInterval(interval);
-  }, [contest, startedAt]);
+  }, [contest, startedAt, hasCompleted, quizResult]);
 
   const fetchQuizData = async () => {
     try {
@@ -98,7 +109,32 @@ export default function Quiz() {
         return;
       }
 
-      // Fetch questions
+      // Check if already completed
+      if (user) {
+        const { data: existingResult } = await supabase
+          .from('contest_results')
+          .select('*')
+          .eq('contest_id', id)
+          .eq('user_id', user.id)
+          .not('completed_at', 'is', null)
+          .maybeSingle();
+
+        if (existingResult) {
+          setHasCompleted(true);
+          setQuizResult({
+            score: existingResult.score || 0,
+            totalQuestions: existingResult.total_questions || 0,
+            percentage: existingResult.total_questions 
+              ? Math.round((existingResult.score || 0) / existingResult.total_questions * 100) 
+              : 0,
+            timeTaken: existingResult.time_taken_seconds || 0,
+          });
+          setLoading(false);
+          return;
+        }
+      }
+
+      // Fetch questions with correct_answer for scoring
       const { data: cqData } = await supabase
         .from('contest_questions')
         .select('question_id, order_index')
@@ -109,7 +145,7 @@ export default function Quiz() {
         const questionIds = cqData.map(cq => cq.question_id);
         const { data: questionsData } = await supabase
           .from('questions')
-          .select('id, question_text, code_block, options')
+          .select('id, question_text, code_block, options, correct_answer')
           .in('id', questionIds);
         
         if (questionsData) {
@@ -136,7 +172,7 @@ export default function Quiz() {
           setAnswers(savedAnswers);
         }
 
-        // Get start time
+        // Get or create start time
         const { data: resultData } = await supabase
           .from('contest_results')
           .select('started_at')
@@ -147,7 +183,17 @@ export default function Quiz() {
         if (resultData?.started_at) {
           setStartedAt(new Date(resultData.started_at));
         } else {
-          setStartedAt(new Date());
+          const now = new Date();
+          setStartedAt(now);
+          // Create initial result entry
+          await supabase
+            .from('contest_results')
+            .upsert({
+              user_id: user.id,
+              contest_id: id,
+              started_at: now.toISOString(),
+              total_questions: cqData?.length || 0,
+            });
         }
       }
     } catch (error) {
@@ -165,17 +211,15 @@ export default function Quiz() {
   const saveAnswer = async (questionId: string, answerIndex: number) => {
     if (!user || !contest) return;
 
-    // Get correct answer
-    const { data: questionData } = await supabase
-      .from('questions')
-      .select('correct_answer')
-      .eq('id', questionId)
-      .maybeSingle();
+    // Find the question to check correct answer
+    const question = questions.find(q => q.id === questionId);
+    if (!question) return;
 
-    const isCorrect = questionData?.correct_answer === answerIndex;
+    // Compare as integers - both are stored as 0-based indices
+    const isCorrect = question.correct_answer === answerIndex;
 
     try {
-      await supabase
+      const { error } = await supabase
         .from('submissions')
         .upsert({
           user_id: user.id,
@@ -184,6 +228,10 @@ export default function Quiz() {
           selected_answer: answerIndex,
           is_correct: isCorrect,
         });
+      
+      if (error) {
+        console.error('Error saving answer:', error);
+      }
     } catch (error) {
       console.error('Error saving answer:', error);
     }
@@ -191,7 +239,7 @@ export default function Quiz() {
 
   const selectAnswer = (answerIndex: number) => {
     const question = questions[currentIndex];
-    if (!question) return;
+    if (!question || hasCompleted || quizResult) return;
 
     setAnswers(prev => ({
       ...prev,
@@ -202,25 +250,43 @@ export default function Quiz() {
   };
 
   const handleSubmit = useCallback(async () => {
-    if (!user || !contest || submitting) return;
+    if (!user || !contest || submitting || quizResult) return;
     
     setSubmitting(true);
 
     try {
-      // Calculate score
-      const { data: submissionsData } = await supabase
-        .from('submissions')
-        .select('is_correct')
-        .eq('contest_id', contest.id)
-        .eq('user_id', user.id);
+      // Calculate score by comparing with correct answers
+      let score = 0;
+      
+      for (const question of questions) {
+        const userAnswer = answers[question.id];
+        if (userAnswer !== undefined && userAnswer === question.correct_answer) {
+          score++;
+        }
+      }
 
-      const score = submissionsData?.filter(s => s.is_correct).length || 0;
       const timeTaken = startedAt 
         ? Math.floor((new Date().getTime() - startedAt.getTime()) / 1000)
         : 0;
 
+      // Update all submissions with correct is_correct values
+      for (const question of questions) {
+        const userAnswer = answers[question.id];
+        if (userAnswer !== undefined) {
+          await supabase
+            .from('submissions')
+            .upsert({
+              user_id: user.id,
+              contest_id: contest.id,
+              question_id: question.id,
+              selected_answer: userAnswer,
+              is_correct: userAnswer === question.correct_answer,
+            });
+        }
+      }
+
       // Update result
-      await supabase
+      const { error } = await supabase
         .from('contest_results')
         .upsert({
           user_id: user.id,
@@ -229,14 +295,27 @@ export default function Quiz() {
           total_questions: questions.length,
           time_taken_seconds: timeTaken,
           completed_at: new Date().toISOString(),
+          started_at: startedAt?.toISOString(),
         });
+
+      if (error) throw error;
+
+      const percentage = questions.length > 0 
+        ? Math.round((score / questions.length) * 100) 
+        : 0;
+
+      setQuizResult({
+        score,
+        totalQuestions: questions.length,
+        percentage,
+        timeTaken,
+      });
+      setHasCompleted(true);
 
       toast({
         title: 'Quiz submitted!',
-        description: `You scored ${score} out of ${questions.length}`,
+        description: `You scored ${score} out of ${questions.length} (${percentage}%)`,
       });
-
-      navigate(`/contest/${contest.id}`);
     } catch (error) {
       console.error('Error submitting quiz:', error);
       toast({
@@ -247,7 +326,7 @@ export default function Quiz() {
     } finally {
       setSubmitting(false);
     }
-  }, [user, contest, submitting, startedAt, questions.length, toast, navigate]);
+  }, [user, contest, submitting, startedAt, questions, answers, quizResult, toast]);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -261,6 +340,73 @@ export default function Quiz() {
         <div className="text-center">
           <div className="h-8 w-8 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
           <p className="text-muted-foreground">Loading quiz...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show result screen if already completed
+  if (quizResult) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <div className="max-w-md w-full">
+          <div className="bg-card border border-border rounded-2xl p-8 text-center">
+            <div className="mb-6">
+              {quizResult.percentage >= 70 ? (
+                <CheckCircle className="h-20 w-20 text-emerald-500 mx-auto" />
+              ) : quizResult.percentage >= 40 ? (
+                <Trophy className="h-20 w-20 text-amber-500 mx-auto" />
+              ) : (
+                <XCircle className="h-20 w-20 text-destructive mx-auto" />
+              )}
+            </div>
+
+            <h1 className="text-2xl font-bold mb-2">
+              {hasCompleted && !submitting ? 'Already Attempted' : 'Quiz Completed!'}
+            </h1>
+            
+            <p className="text-muted-foreground mb-6">
+              {hasCompleted && !submitting 
+                ? 'You have already attempted this contest.'
+                : 'Great job completing the quiz!'}
+            </p>
+
+            <div className="grid grid-cols-3 gap-4 mb-8">
+              <div className="p-4 rounded-lg bg-secondary">
+                <p className="text-3xl font-bold text-primary">{quizResult.score}</p>
+                <p className="text-sm text-muted-foreground">Score</p>
+              </div>
+              <div className="p-4 rounded-lg bg-secondary">
+                <p className="text-3xl font-bold">{quizResult.totalQuestions}</p>
+                <p className="text-sm text-muted-foreground">Total</p>
+              </div>
+              <div className="p-4 rounded-lg bg-secondary">
+                <p className="text-3xl font-bold text-primary">{quizResult.percentage}%</p>
+                <p className="text-sm text-muted-foreground">Accuracy</p>
+              </div>
+            </div>
+
+            <div className="p-4 rounded-lg bg-muted mb-6">
+              <p className="text-sm text-muted-foreground">Time Taken</p>
+              <p className="text-xl font-mono font-bold">
+                {Math.floor(quizResult.timeTaken / 60)}m {quizResult.timeTaken % 60}s
+              </p>
+            </div>
+
+            <div className="space-y-3">
+              <Link to={`/leaderboard?contest=${contest?.id}`} className="block">
+                <Button className="w-full" size="lg">
+                  <Trophy className="h-4 w-4 mr-2" />
+                  View Leaderboard
+                </Button>
+              </Link>
+              <Link to="/contests" className="block">
+                <Button variant="outline" className="w-full" size="lg">
+                  Browse More Contests
+                </Button>
+              </Link>
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -324,7 +470,7 @@ export default function Quiz() {
                 idx === currentIndex
                   ? 'bg-primary text-primary-foreground'
                   : answers[q.id] !== undefined
-                  ? 'bg-glow-success/20 text-glow-success border border-glow-success/30'
+                  ? 'bg-emerald-500/20 text-emerald-500 border border-emerald-500/30'
                   : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
               }`}
             >

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Layout } from '@/components/Layout';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -16,7 +16,8 @@ import {
   Users,
   AlertCircle,
   CheckCircle,
-  Timer
+  Timer,
+  UserPlus
 } from 'lucide-react';
 import { format, addMinutes, differenceInSeconds } from 'date-fns';
 
@@ -33,21 +34,24 @@ function getContestStatus(contest: Contest): 'upcoming' | 'live' | 'ended' {
 export default function ContestDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuth();
   const { toast } = useToast();
   
   const [contest, setContest] = useState<Contest | null>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [loading, setLoading] = useState(true);
-  const [participating, setParticipating] = useState(false);
+  const [isRegistered, setIsRegistered] = useState(false);
+  const [registrationCount, setRegistrationCount] = useState(0);
   const [userResult, setUserResult] = useState<ContestResult | null>(null);
   const [timeRemaining, setTimeRemaining] = useState<string>('');
+  const [registering, setRegistering] = useState(false);
 
   useEffect(() => {
     if (id) {
       fetchContestDetails();
     }
-  }, [id]);
+  }, [id, user]);
 
   useEffect(() => {
     if (!contest) return;
@@ -100,7 +104,7 @@ export default function ContestDetail() {
 
       setContest(contestData as Contest);
 
-      // Fetch questions
+      // Fetch questions count
       const { data: cqData } = await supabase
         .from('contest_questions')
         .select('question_id, order_index')
@@ -115,7 +119,6 @@ export default function ContestDetail() {
           .in('id', questionIds);
         
         if (questionsData) {
-          // Sort by order
           const sortedQuestions = questionIds.map(qid => 
             questionsData.find(q => q.id === qid)
           ).filter(Boolean) as Question[];
@@ -123,8 +126,25 @@ export default function ContestDetail() {
         }
       }
 
-      // Check user participation
+      // Fetch registration count - use any since table was just created
+      const { count } = await (supabase as any)
+        .from('contest_registrations')
+        .select('*', { count: 'exact', head: true })
+        .eq('contest_id', id);
+      
+      setRegistrationCount(count || 0);
+
+      // Check user registration and result
       if (user) {
+        const { data: regData } = await (supabase as any)
+          .from('contest_registrations')
+          .select('id')
+          .eq('contest_id', id)
+          .eq('user_id', user.id)
+          .maybeSingle();
+        
+        setIsRegistered(!!regData);
+
         const { data: resultData } = await supabase
           .from('contest_results')
           .select('*')
@@ -134,7 +154,6 @@ export default function ContestDetail() {
         
         if (resultData) {
           setUserResult(resultData as ContestResult);
-          setParticipating(true);
         }
       }
     } catch (error) {
@@ -149,13 +168,47 @@ export default function ContestDetail() {
     }
   };
 
+  const handleRegister = async () => {
+    if (!user) {
+      // Save current URL to redirect after login
+      sessionStorage.setItem('redirectAfterAuth', location.pathname);
+      navigate('/auth');
+      return;
+    }
+
+    if (!contest) return;
+
+    setRegistering(true);
+    try {
+      const { error } = await (supabase as any)
+        .from('contest_registrations')
+        .insert({
+          user_id: user.id,
+          contest_id: contest.id,
+        });
+
+      if (error) {
+        if (error.code === '23505') {
+          toast({ title: 'Already registered', description: 'You are already registered for this contest.' });
+        } else {
+          throw error;
+        }
+      } else {
+        setIsRegistered(true);
+        setRegistrationCount(prev => prev + 1);
+        toast({ title: 'Registered!', description: 'You have successfully registered for this contest.' });
+      }
+    } catch (error) {
+      console.error('Error registering:', error);
+      toast({ title: 'Error', description: 'Failed to register. Please try again.', variant: 'destructive' });
+    } finally {
+      setRegistering(false);
+    }
+  };
+
   const startContest = async () => {
     if (!user || !contest) {
-      toast({
-        title: 'Sign in required',
-        description: 'Please sign in to participate in contests.',
-        variant: 'destructive',
-      });
+      sessionStorage.setItem('redirectAfterAuth', `/quiz/${id}`);
       navigate('/auth');
       return;
     }
@@ -170,27 +223,22 @@ export default function ContestDetail() {
       return;
     }
 
-    try {
-      // Create or update contest result
-      const { error } = await supabase
-        .from('contest_results')
-        .upsert({
-          user_id: user.id,
-          contest_id: contest.id,
-          total_questions: questions.length,
-          started_at: new Date().toISOString(),
-        });
-
-      if (error) throw error;
-      navigate(`/quiz/${contest.id}`);
-    } catch (error) {
-      console.error('Error starting contest:', error);
+    // Check if already completed
+    if (userResult?.completed_at) {
       toast({
-        title: 'Error',
-        description: 'Failed to start contest. Please try again.',
+        title: 'Already attempted',
+        description: 'You have already completed this contest.',
         variant: 'destructive',
       });
+      return;
     }
+
+    // Auto-register if not registered
+    if (!isRegistered) {
+      await handleRegister();
+    }
+
+    navigate(`/quiz/${contest.id}`);
   };
 
   if (loading) {
@@ -222,17 +270,17 @@ export default function ContestDetail() {
 
   const status = getContestStatus(contest);
   const startTime = new Date(contest.start_time);
-  const endTime = addMinutes(startTime, contest.duration_minutes);
+  const hasCompleted = !!userResult?.completed_at;
 
   const statusConfig = {
     upcoming: {
       badge: 'Upcoming',
-      color: 'bg-glow-warning/20 text-glow-warning border-glow-warning/30',
+      color: 'bg-amber-500/20 text-amber-500 border-amber-500/30',
       timerLabel: 'Starts in',
     },
     live: {
       badge: 'Live Now',
-      color: 'bg-glow-success/20 text-glow-success border-glow-success/30 animate-pulse',
+      color: 'bg-emerald-500/20 text-emerald-500 border-emerald-500/30 animate-pulse',
       timerLabel: 'Ends in',
     },
     ended: {
@@ -250,7 +298,7 @@ export default function ContestDetail() {
         {/* Header */}
         <div className="mb-8">
           <div className="flex flex-wrap items-center gap-3 mb-4">
-            <Badge className={`capitalize bg-primary/20 text-primary`}>
+            <Badge className="capitalize bg-primary/20 text-primary">
               {contest.contest_type}
             </Badge>
             <Badge variant="outline" className={config.color}>
@@ -272,14 +320,14 @@ export default function ContestDetail() {
           <div className="lg:col-span-2 space-y-6">
             {/* Timer Card */}
             <div className={`p-6 rounded-xl border ${
-              status === 'live' ? 'bg-glow-success/5 border-glow-success/30' : 'bg-card border-border'
+              status === 'live' ? 'bg-emerald-500/5 border-emerald-500/30' : 'bg-card border-border'
             }`}>
               <div className="flex items-center gap-3 mb-4">
-                <Timer className={`h-6 w-6 ${status === 'live' ? 'text-glow-success animate-pulse' : 'text-muted-foreground'}`} />
+                <Timer className={`h-6 w-6 ${status === 'live' ? 'text-emerald-500 animate-pulse' : 'text-muted-foreground'}`} />
                 <span className="font-medium">{config.timerLabel}</span>
               </div>
               <p className={`text-4xl font-mono font-bold ${
-                status === 'live' ? 'text-glow-success' : status === 'upcoming' ? 'text-primary' : 'text-muted-foreground'
+                status === 'live' ? 'text-emerald-500' : status === 'upcoming' ? 'text-primary' : 'text-muted-foreground'
               }`}>
                 {timeRemaining}
               </p>
@@ -315,10 +363,10 @@ export default function ContestDetail() {
                 </div>
 
                 <div className="flex items-center gap-3 p-4 rounded-lg bg-secondary/50">
-                  <CheckCircle className="h-5 w-5 text-primary" />
+                  <Users className="h-5 w-5 text-primary" />
                   <div>
-                    <p className="text-sm text-muted-foreground">Format</p>
-                    <p className="font-medium">Output-based MCQ</p>
+                    <p className="text-sm text-muted-foreground">Registered</p>
+                    <p className="font-medium">{registrationCount} participants</p>
                   </div>
                 </div>
               </div>
@@ -331,22 +379,38 @@ export default function ContestDetail() {
                   <Trophy className="h-6 w-6 text-primary" />
                   <h3 className="font-semibold text-lg">Your Result</h3>
                 </div>
-                <div className="grid sm:grid-cols-3 gap-4">
+                <div className="grid sm:grid-cols-4 gap-4">
                   <div className="text-center p-4 rounded-lg bg-background/50">
                     <p className="text-3xl font-bold text-primary">{userResult.score}</p>
                     <p className="text-sm text-muted-foreground">Score</p>
                   </div>
                   <div className="text-center p-4 rounded-lg bg-background/50">
                     <p className="text-3xl font-bold">{userResult.total_questions}</p>
-                    <p className="text-sm text-muted-foreground">Total Questions</p>
+                    <p className="text-sm text-muted-foreground">Total</p>
+                  </div>
+                  <div className="text-center p-4 rounded-lg bg-background/50">
+                    <p className="text-3xl font-bold text-primary">
+                      {userResult.total_questions 
+                        ? Math.round((userResult.score || 0) / userResult.total_questions * 100) 
+                        : 0}%
+                    </p>
+                    <p className="text-sm text-muted-foreground">Accuracy</p>
                   </div>
                   <div className="text-center p-4 rounded-lg bg-background/50">
                     <p className="text-3xl font-bold">
                       {userResult.time_taken_seconds ? Math.floor(userResult.time_taken_seconds / 60) : 0}m
                     </p>
-                    <p className="text-sm text-muted-foreground">Time Taken</p>
+                    <p className="text-sm text-muted-foreground">Time</p>
                   </div>
                 </div>
+                <Button 
+                  className="w-full mt-4" 
+                  variant="outline"
+                  onClick={() => navigate(`/leaderboard?contest=${contest.id}`)}
+                >
+                  <Trophy className="h-4 w-4 mr-2" />
+                  View Leaderboard
+                </Button>
               </div>
             )}
           </div>
@@ -355,10 +419,35 @@ export default function ContestDetail() {
           <div className="space-y-6">
             {/* Action Card */}
             <div className="p-6 rounded-xl bg-card border border-border sticky top-24">
-              {status === 'live' && !userResult?.completed_at && (
+              {/* Already completed */}
+              {hasCompleted && (
                 <>
                   <div className="mb-6">
-                    <div className="flex items-center gap-2 text-glow-success mb-2">
+                    <div className="flex items-center gap-2 text-primary mb-2">
+                      <CheckCircle className="h-5 w-5" />
+                      <span className="font-medium">Completed</span>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      You have already attempted this contest.
+                    </p>
+                  </div>
+                  <Button 
+                    className="w-full" 
+                    size="lg" 
+                    variant="outline"
+                    onClick={() => navigate(`/leaderboard?contest=${contest.id}`)}
+                  >
+                    View Leaderboard
+                    <Trophy className="h-4 w-4 ml-2" />
+                  </Button>
+                </>
+              )}
+
+              {/* Live and not completed */}
+              {status === 'live' && !hasCompleted && (
+                <>
+                  <div className="mb-6">
+                    <div className="flex items-center gap-2 text-emerald-500 mb-2">
                       <Play className="h-5 w-5" />
                       <span className="font-medium">Contest is Live!</span>
                     </div>
@@ -367,30 +456,45 @@ export default function ContestDetail() {
                     </p>
                   </div>
                   <Button className="w-full" size="lg" onClick={startContest}>
-                    {participating ? 'Continue Quiz' : 'Start Quiz'}
+                    {isRegistered ? 'Start Quiz' : 'Join & Start Quiz'}
                     <ChevronRight className="h-4 w-4 ml-1" />
                   </Button>
                 </>
               )}
 
-              {status === 'upcoming' && (
+              {/* Upcoming */}
+              {status === 'upcoming' && !hasCompleted && (
                 <>
                   <div className="mb-6">
-                    <div className="flex items-center gap-2 text-glow-warning mb-2">
+                    <div className="flex items-center gap-2 text-amber-500 mb-2">
                       <Clock className="h-5 w-5" />
                       <span className="font-medium">Coming Soon</span>
                     </div>
                     <p className="text-sm text-muted-foreground">
-                      This contest hasn't started yet. Come back when it's live!
+                      Register now to get notified when it starts!
                     </p>
                   </div>
-                  <Button className="w-full" size="lg" variant="outline" disabled>
-                    Waiting to Start
-                  </Button>
+                  {isRegistered ? (
+                    <Button className="w-full" size="lg" variant="outline" disabled>
+                      <CheckCircle className="h-4 w-4 mr-2" />
+                      Registered
+                    </Button>
+                  ) : (
+                    <Button 
+                      className="w-full" 
+                      size="lg" 
+                      onClick={handleRegister}
+                      disabled={registering}
+                    >
+                      <UserPlus className="h-4 w-4 mr-2" />
+                      {registering ? 'Registering...' : 'Register Now'}
+                    </Button>
+                  )}
                 </>
               )}
 
-              {status === 'ended' && (
+              {/* Ended and not completed */}
+              {status === 'ended' && !hasCompleted && (
                 <>
                   <div className="mb-6">
                     <div className="flex items-center gap-2 text-muted-foreground mb-2">
@@ -413,7 +517,7 @@ export default function ContestDetail() {
                 </>
               )}
 
-              {!user && status === 'live' && (
+              {!user && (status === 'live' || status === 'upcoming') && (
                 <p className="text-sm text-center text-muted-foreground mt-4">
                   <a href="/auth" className="text-primary hover:underline">Sign in</a> to participate
                 </p>
