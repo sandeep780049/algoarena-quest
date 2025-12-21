@@ -53,6 +53,35 @@ export type Database = {
           },
         ]
       }
+      contest_registrations: {
+        Row: {
+          contest_id: string
+          id: string
+          registered_at: string
+          user_id: string
+        }
+        Insert: {
+          contest_id: string
+          id?: string
+          registered_at?: string
+          user_id: string
+        }
+        Update: {
+          contest_id?: string
+          id?: string
+          registered_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contest_registrations_contest_id_fkey"
+            columns: ["contest_id"]
+            isOneToOne: false
+            referencedRelation: "contests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       contest_results: {
         Row: {
           completed_at: string | null
