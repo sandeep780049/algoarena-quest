@@ -255,6 +255,33 @@ export default function Quiz() {
     setSubmitting(true);
 
     try {
+      // Check if already completed - if so, fetch existing result and show it
+      const { data: existingResult } = await supabase
+        .from('contest_results')
+        .select('*')
+        .eq('contest_id', contest.id)
+        .eq('user_id', user.id)
+        .not('completed_at', 'is', null)
+        .maybeSingle();
+
+      if (existingResult) {
+        // Already submitted - show existing result
+        setQuizResult({
+          score: existingResult.score || 0,
+          totalQuestions: existingResult.total_questions || 0,
+          percentage: existingResult.total_questions 
+            ? Math.round((existingResult.score || 0) / existingResult.total_questions * 100) 
+            : 0,
+          timeTaken: existingResult.time_taken_seconds || 0,
+        });
+        setHasCompleted(true);
+        toast({
+          title: 'Already submitted',
+          description: 'You have already submitted this quiz.',
+        });
+        return;
+      }
+
       // Calculate score by comparing with correct answers
       let score = 0;
       
@@ -285,20 +312,45 @@ export default function Quiz() {
         }
       }
 
-      // Update result
-      const { error } = await supabase
+      // First, check if a result row exists (started but not completed)
+      const { data: startedResult } = await supabase
         .from('contest_results')
-        .upsert({
-          user_id: user.id,
-          contest_id: contest.id,
-          score,
-          total_questions: questions.length,
-          time_taken_seconds: timeTaken,
-          completed_at: new Date().toISOString(),
-          started_at: startedAt?.toISOString(),
-        });
+        .select('id')
+        .eq('contest_id', contest.id)
+        .eq('user_id', user.id)
+        .maybeSingle();
 
-      if (error) throw error;
+      let resultError = null;
+
+      if (startedResult) {
+        // Update the existing row
+        const { error } = await supabase
+          .from('contest_results')
+          .update({
+            score,
+            total_questions: questions.length,
+            time_taken_seconds: timeTaken,
+            completed_at: new Date().toISOString(),
+          })
+          .eq('id', startedResult.id);
+        resultError = error;
+      } else {
+        // Insert a new row
+        const { error } = await supabase
+          .from('contest_results')
+          .insert({
+            user_id: user.id,
+            contest_id: contest.id,
+            score,
+            total_questions: questions.length,
+            time_taken_seconds: timeTaken,
+            completed_at: new Date().toISOString(),
+            started_at: startedAt?.toISOString() || new Date().toISOString(),
+          });
+        resultError = error;
+      }
+
+      if (resultError) throw resultError;
 
       const percentage = questions.length > 0 
         ? Math.round((score / questions.length) * 100) 
