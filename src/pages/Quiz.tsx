@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -41,6 +41,9 @@ export default function Quiz() {
   const [startedAt, setStartedAt] = useState<Date | null>(null);
   const [quizResult, setQuizResult] = useState<QuizResult | null>(null);
   const [hasCompleted, setHasCompleted] = useState(false);
+  
+  // Prevent double submission
+  const isSubmittingRef = useRef(false);
 
   useEffect(() => {
     if (!user) {
@@ -64,6 +67,7 @@ export default function Quiz() {
       const diff = differenceInSeconds(endTime, now);
       
       if (diff <= 0) {
+        // Auto-submit when time runs out
         handleSubmit();
         return;
       }
@@ -109,7 +113,7 @@ export default function Quiz() {
         return;
       }
 
-      // Check if already completed
+      // Check if user has COMPLETED this contest (has completed_at set)
       if (user) {
         const { data: existingResult } = await supabase
           .from('contest_results')
@@ -120,6 +124,7 @@ export default function Quiz() {
           .maybeSingle();
 
         if (existingResult) {
+          // User has already submitted - show their result
           setHasCompleted(true);
           setQuizResult({
             score: existingResult.score || 0,
@@ -156,7 +161,7 @@ export default function Quiz() {
         }
       }
 
-      // Load existing answers
+      // Load existing answers from submissions (in case user refreshed)
       if (user) {
         const { data: submissionsData } = await supabase
           .from('submissions')
@@ -171,31 +176,12 @@ export default function Quiz() {
           });
           setAnswers(savedAnswers);
         }
-
-        // Get or create start time
-        const { data: resultData } = await supabase
-          .from('contest_results')
-          .select('started_at')
-          .eq('contest_id', id)
-          .eq('user_id', user.id)
-          .maybeSingle();
-        
-        if (resultData?.started_at) {
-          setStartedAt(new Date(resultData.started_at));
-        } else {
-          const now = new Date();
-          setStartedAt(now);
-          // Create initial result entry
-          await supabase
-            .from('contest_results')
-            .upsert({
-              user_id: user.id,
-              contest_id: id,
-              started_at: now.toISOString(),
-              total_questions: cqData?.length || 0,
-            });
-        }
       }
+
+      // Set start time - DON'T create contest_results row here
+      // The row will only be created when user submits
+      setStartedAt(new Date());
+      
     } catch (error) {
       console.error('Error fetching quiz:', error);
       toast({
@@ -215,8 +201,9 @@ export default function Quiz() {
     const question = questions.find(q => q.id === questionId);
     if (!question) return;
 
-    // Compare as integers - both are stored as 0-based indices
-    const isCorrect = question.correct_answer === answerIndex;
+    // Compare as integers - both should be 0-based indices
+    const correctAnswer = Number(question.correct_answer);
+    const isCorrect = correctAnswer === answerIndex;
 
     try {
       const { error } = await supabase
@@ -250,12 +237,14 @@ export default function Quiz() {
   };
 
   const handleSubmit = useCallback(async () => {
-    if (!user || !contest || submitting || quizResult) return;
+    // Prevent double submission using ref (works across renders)
+    if (!user || !contest || isSubmittingRef.current || quizResult || hasCompleted) return;
     
+    isSubmittingRef.current = true;
     setSubmitting(true);
 
     try {
-      // Check if already completed - if so, fetch existing result and show it
+      // FIRST: Check if user has already completed this contest
       const { data: existingResult } = await supabase
         .from('contest_results')
         .select('*')
@@ -265,7 +254,7 @@ export default function Quiz() {
         .maybeSingle();
 
       if (existingResult) {
-        // Already submitted - show existing result
+        // Already submitted - show existing result without error
         setQuizResult({
           score: existingResult.score || 0,
           totalQuestions: existingResult.total_questions || 0,
@@ -276,8 +265,8 @@ export default function Quiz() {
         });
         setHasCompleted(true);
         toast({
-          title: 'Already submitted',
-          description: 'You have already submitted this quiz.',
+          title: 'Quiz already submitted',
+          description: 'Showing your previous result.',
         });
         return;
       }
@@ -287,7 +276,9 @@ export default function Quiz() {
       
       for (const question of questions) {
         const userAnswer = answers[question.id];
-        if (userAnswer !== undefined && userAnswer === question.correct_answer) {
+        const correctAnswer = Number(question.correct_answer);
+        
+        if (userAnswer !== undefined && userAnswer === correctAnswer) {
           score++;
         }
       }
@@ -300,6 +291,7 @@ export default function Quiz() {
       for (const question of questions) {
         const userAnswer = answers[question.id];
         if (userAnswer !== undefined) {
+          const correctAnswer = Number(question.correct_answer);
           await supabase
             .from('submissions')
             .upsert({
@@ -307,23 +299,25 @@ export default function Quiz() {
               contest_id: contest.id,
               question_id: question.id,
               selected_answer: userAnswer,
-              is_correct: userAnswer === question.correct_answer,
+              is_correct: userAnswer === correctAnswer,
             });
         }
       }
 
-      // First, check if a result row exists (started but not completed)
-      const { data: startedResult } = await supabase
+      // Now create/update the contest_results row
+      // Check if there's an existing incomplete row first
+      const { data: incompleteResult } = await supabase
         .from('contest_results')
         .select('id')
         .eq('contest_id', contest.id)
         .eq('user_id', user.id)
+        .is('completed_at', null)
         .maybeSingle();
 
       let resultError = null;
 
-      if (startedResult) {
-        // Update the existing row
+      if (incompleteResult) {
+        // Update the existing incomplete row
         const { error } = await supabase
           .from('contest_results')
           .update({
@@ -332,10 +326,10 @@ export default function Quiz() {
             time_taken_seconds: timeTaken,
             completed_at: new Date().toISOString(),
           })
-          .eq('id', startedResult.id);
+          .eq('id', incompleteResult.id);
         resultError = error;
       } else {
-        // Insert a new row
+        // Insert a new row with all data
         const { error } = await supabase
           .from('contest_results')
           .insert({
@@ -375,10 +369,12 @@ export default function Quiz() {
         description: 'Failed to submit quiz. Please try again.',
         variant: 'destructive',
       });
+      // Reset the ref so user can try again
+      isSubmittingRef.current = false;
     } finally {
       setSubmitting(false);
     }
-  }, [user, contest, submitting, startedAt, questions, answers, quizResult, toast]);
+  }, [user, contest, startedAt, questions, answers, quizResult, hasCompleted, toast]);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -414,13 +410,11 @@ export default function Quiz() {
             </div>
 
             <h1 className="text-2xl font-bold mb-2">
-              {hasCompleted && !submitting ? 'Already Attempted' : 'Quiz Completed!'}
+              Quiz Completed!
             </h1>
             
             <p className="text-muted-foreground mb-6">
-              {hasCompleted && !submitting 
-                ? 'You have already attempted this contest.'
-                : 'Great job completing the quiz!'}
+              Great job completing the quiz!
             </p>
 
             <div className="grid grid-cols-3 gap-4 mb-8">

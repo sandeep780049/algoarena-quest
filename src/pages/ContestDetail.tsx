@@ -145,11 +145,13 @@ export default function ContestDetail() {
         
         setIsRegistered(!!regData);
 
+        // Only fetch COMPLETED results (with completed_at set)
         const { data: resultData } = await supabase
           .from('contest_results')
           .select('*')
           .eq('contest_id', id)
           .eq('user_id', user.id)
+          .not('completed_at', 'is', null)
           .maybeSingle();
         
         if (resultData) {
