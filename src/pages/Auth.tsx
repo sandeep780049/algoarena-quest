@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Terminal, Eye, EyeOff, ArrowLeft } from 'lucide-react';
 import { z } from 'zod';
+import { supabase } from '@/lib/supabase';
 
 const signInSchema = z.object({
   email: z.string().email('Please enter a valid email'),
@@ -73,6 +74,16 @@ export default function Auth() {
     }
   };
 
+  const checkUsernameExists = async (usernameToCheck: string): Promise<boolean> => {
+    const { data } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('username', usernameToCheck)
+      .maybeSingle();
+    
+    return !!data;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -82,6 +93,19 @@ export default function Auth() {
 
     try {
       if (isSignUp) {
+        // Check if username already exists BEFORE attempting signup
+        const usernameExists = await checkUsernameExists(username);
+        if (usernameExists) {
+          setErrors({ username: 'Username already taken. Please choose another.' });
+          toast({
+            title: 'Username taken',
+            description: 'This username is already in use. Please choose a different one.',
+            variant: 'destructive',
+          });
+          setLoading(false);
+          return;
+        }
+
         const { error } = await signUp(email, password, username);
         if (error) {
           if (error.message.includes('already registered')) {
