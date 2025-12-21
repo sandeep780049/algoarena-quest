@@ -212,12 +212,12 @@ export function Layout({ children }: LayoutProps) {
               <span className="text-sm text-muted-foreground">
                 JC AlgoArena • Inspired by{' '}
                 <a 
-                  href="https://instagram.com/jc_coder" 
+                  href="https://instagram.com/jc_coder_" 
                   target="_blank" 
                   rel="noopener noreferrer"
                   className="text-primary hover:underline"
                 >
-                  @jc_coder
+                  @jc_coder_
                 </a>
               </span>
             </div>
