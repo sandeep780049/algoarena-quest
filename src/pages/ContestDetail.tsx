@@ -180,6 +180,17 @@ export default function ContestDetail() {
 
     if (!contest) return;
 
+    // Prevent registration if contest has started
+    const status = getContestStatus(contest);
+    if (status !== 'upcoming') {
+      toast({ 
+        title: 'Registration Closed', 
+        description: 'Registration closed – contest is live', 
+        variant: 'destructive' 
+      });
+      return;
+    }
+
     setRegistering(true);
     try {
       const { error } = await (supabase as any)

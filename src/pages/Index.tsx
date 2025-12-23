@@ -98,7 +98,7 @@ function ContestCard({ contest }: { contest: ContestWithCount }) {
 }
 
 export default function Index() {
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
   const [liveContests, setLiveContests] = useState<ContestWithCount[]>([]);
   const [upcomingContests, setUpcomingContests] = useState<ContestWithCount[]>([]);
   const [dailyContests, setDailyContests] = useState<ContestWithCount[]>([]);
@@ -108,8 +108,10 @@ export default function Index() {
 
   useEffect(() => {
     fetchContests();
-    fetchStats();
-  }, []);
+    if (isAdmin) {
+      fetchStats();
+    }
+  }, [isAdmin]);
 
   const fetchStats = async () => {
     const [questionsRes, usersRes, contestsRes] = await Promise.all([
@@ -263,20 +265,22 @@ export default function Index() {
               )}
             </div>
 
-            <div className="grid grid-cols-3 gap-8 pt-6 max-w-lg mx-auto">
-              <div className="text-center">
-                <p className="text-2xl md:text-3xl font-bold text-primary">{stats.questions || '100'}+</p>
-                <p className="text-sm text-muted-foreground">Questions</p>
+            {isAdmin && (
+              <div className="grid grid-cols-3 gap-8 pt-6 max-w-lg mx-auto">
+                <div className="text-center">
+                  <p className="text-2xl md:text-3xl font-bold text-primary">{stats.questions || '0'}+</p>
+                  <p className="text-sm text-muted-foreground">Questions</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-2xl md:text-3xl font-bold text-primary">{stats.users || '0'}</p>
+                  <p className="text-sm text-muted-foreground">Users</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-2xl md:text-3xl font-bold text-primary">{stats.contests || '0'}</p>
+                  <p className="text-sm text-muted-foreground">Contests</p>
+                </div>
               </div>
-              <div className="text-center">
-                <p className="text-2xl md:text-3xl font-bold text-primary">{stats.users || '0'}</p>
-                <p className="text-sm text-muted-foreground">Users</p>
-              </div>
-              <div className="text-center">
-                <p className="text-2xl md:text-3xl font-bold text-primary">{stats.contests || '0'}</p>
-                <p className="text-sm text-muted-foreground">Contests</p>
-              </div>
-            </div>
+            )}
           </div>
         </div>
 

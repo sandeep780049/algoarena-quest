@@ -42,7 +42,7 @@ function getContestStatus(contest: Contest): 'upcoming' | 'live' | 'ended' {
 }
 
 export default function Leaderboard() {
-  const { user, profile: currentUserProfile } = useAuth();
+  const { user, profile: currentUserProfile, isAdmin } = useAuth();
   const [searchParams] = useSearchParams();
   const contestId = searchParams.get('contest');
   
@@ -192,6 +192,38 @@ export default function Leaderboard() {
   };
 
   const currentUserEntry = user ? entries.find(e => e.user_id === user.id) : null;
+  const top3Entries = entries.slice(0, 3);
+  const restEntries = entries.filter(e => e.rank > 3);
+
+  // Helper function to render share button for any entry
+  const renderShareButton = (entry: LeaderboardEntry, entryProfile: Profile | null) => {
+    if (!selectedContestData) return null;
+    
+    return (
+      <Dialog>
+        <DialogTrigger asChild>
+          <Button size="sm" variant="outline">
+            <Share2 className="h-4 w-4 mr-2" />
+            Share
+          </Button>
+        </DialogTrigger>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Share Result</DialogTitle>
+          </DialogHeader>
+          <ShareResultCard
+            contestName={selectedContestData.name}
+            rank={entry.rank}
+            score={entry.score || 0}
+            totalQuestions={entry.total_questions || 0}
+            username={entryProfile?.username || 'Anonymous'}
+            avatarUrl={entryProfile?.avatar_url}
+            timeTaken={formatTime(entry.time_taken_seconds as number)}
+          />
+        </DialogContent>
+      </Dialog>
+    );
+  };
 
   return (
     <Layout>
@@ -265,9 +297,35 @@ export default function Leaderboard() {
             {/* Podium for Top 3 */}
             <Podium entries={entries} currentUserId={user?.id} />
 
-            {/* Current User Highlight (if not in top 3) */}
-            {currentUserEntry && currentUserEntry.rank > 3 && (
+            {/* Top 3 Share Buttons (for admin or for the user's own entry) */}
+            {selectedContestData && top3Entries.length > 0 && (
+              <div className="flex flex-wrap justify-center gap-4 mb-4">
+                {top3Entries.map((entry) => {
+                  const isCurrentUser = entry.user_id === user?.id;
+                  const canShare = isCurrentUser || isAdmin;
+                  
+                  if (!canShare) return null;
+                  
+                  return (
+                    <div key={entry.user_id} className="flex items-center gap-2">
+                      <Badge className={getRankBadgeStyle(entry.rank)}>
+                        #{entry.rank}
+                      </Badge>
+                      <span className="text-sm font-medium">
+                        {entry.profile?.username || 'Anonymous'}
+                        {isCurrentUser && ' (You)'}
+                      </span>
+                      {renderShareButton(entry, entry.profile)}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* "— You —" Row - Shows for current user regardless of rank */}
+            {currentUserEntry && (
               <div className="p-4 rounded-xl bg-primary/10 border border-primary/30">
+                <div className="text-center text-sm text-muted-foreground mb-3">— You —</div>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-4">
                     <Badge className={getRankBadgeStyle(currentUserEntry.rank)}>
@@ -289,51 +347,30 @@ export default function Leaderboard() {
                       <p className="text-2xl font-bold text-primary">{currentUserEntry.score}</p>
                       <p className="text-sm text-muted-foreground">points</p>
                     </div>
-                    {selectedContestData && (
-                      <Dialog>
-                        <DialogTrigger asChild>
-                          <Button size="sm" variant="outline">
-                            <Share2 className="h-4 w-4 mr-2" />
-                            Share
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent className="max-w-md">
-                          <DialogHeader>
-                            <DialogTitle>Share Your Result</DialogTitle>
-                          </DialogHeader>
-                          <ShareResultCard
-                            contestName={selectedContestData.name}
-                            rank={currentUserEntry.rank}
-                            score={currentUserEntry.score || 0}
-                            totalQuestions={currentUserEntry.total_questions || 0}
-                            username={currentUserProfile?.username || 'Anonymous'}
-                            avatarUrl={currentUserProfile?.avatar_url}
-                            timeTaken={formatTime(currentUserEntry.time_taken_seconds as number)}
-                          />
-                        </DialogContent>
-                      </Dialog>
-                    )}
+                    {renderShareButton(currentUserEntry, currentUserProfile)}
                   </div>
                 </div>
               </div>
             )}
 
             {/* Full Ranking List (from rank 4 onwards) */}
-            {entries.filter(e => e.rank > 3).length > 0 && (
+            {restEntries.length > 0 && (
               <div className="space-y-2">
                 <h3 className="text-lg font-semibold mb-4">Full Rankings</h3>
                 
                 {/* Header */}
                 <div className="hidden md:grid grid-cols-12 gap-4 px-4 py-2 text-sm text-muted-foreground">
                   <div className="col-span-1">Rank</div>
-                  <div className="col-span-5">User</div>
+                  <div className="col-span-4">User</div>
                   <div className="col-span-2 text-center">Score</div>
                   <div className="col-span-2 text-center">Questions</div>
-                  <div className="col-span-2 text-center">Time</div>
+                  <div className="col-span-1 text-center">Time</div>
+                  <div className="col-span-2 text-center">Actions</div>
                 </div>
 
-                {entries.filter(e => e.rank > 3).map((entry) => {
+                {restEntries.map((entry) => {
                   const isCurrentUser = entry.user_id === user?.id;
+                  const canShare = isCurrentUser || isAdmin;
                   
                   return (
                     <div
@@ -349,7 +386,7 @@ export default function Leaderboard() {
                           #{entry.rank}
                         </Badge>
                       </div>
-                      <div className="col-span-10 md:col-span-5">
+                      <div className="col-span-10 md:col-span-4">
                         <Link 
                           to={`/profile/${entry.user_id}`}
                           className="flex items-center gap-3 hover:text-primary transition-colors"
@@ -372,9 +409,12 @@ export default function Leaderboard() {
                       <div className="col-span-4 md:col-span-2 text-center text-muted-foreground">
                         {entry.total_questions || '-'}
                       </div>
-                      <div className="col-span-4 md:col-span-2 text-center text-muted-foreground">
+                      <div className="col-span-4 md:col-span-1 text-center text-muted-foreground">
                         <Clock className="h-4 w-4 inline mr-1" />
                         {formatTime(entry.time_taken_seconds as number)}
+                      </div>
+                      <div className="col-span-12 md:col-span-2 flex justify-center">
+                        {canShare && selectedContestData && renderShareButton(entry, entry.profile)}
                       </div>
                     </div>
                   );
