@@ -9,13 +9,15 @@ import { useAuth } from '@/hooks/useAuth';
 import type { Contest, ContestResult, Profile } from '@/lib/supabase';
 import { Podium } from '@/components/leaderboard/Podium';
 import { ShareResultCard } from '@/components/share/ShareResultCard';
+import { ShareTop3Card } from '@/components/share/ShareTop3Card';
 import { 
   Trophy, 
   Clock, 
   User, 
   Lock,
   Share2,
-  AlertCircle
+  AlertCircle,
+  Award
 } from 'lucide-react';
 import { addMinutes } from 'date-fns';
 import {
@@ -296,6 +298,35 @@ export default function Leaderboard() {
           <div className="space-y-8">
             {/* Podium for Top 3 */}
             <Podium entries={entries} currentUserId={user?.id} />
+
+            {/* Share Top 3 Button - visible to everyone when contest is selected */}
+            {selectedContestData && top3Entries.length >= 3 && (
+              <div className="flex justify-center">
+                <Dialog>
+                  <DialogTrigger asChild>
+                    <Button variant="outline" className="gap-2">
+                      <Award className="h-4 w-4" />
+                      Share Top 3
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-lg">
+                    <DialogHeader>
+                      <DialogTitle>Share Top 3 Winners</DialogTitle>
+                    </DialogHeader>
+                    <ShareTop3Card
+                      contestName={selectedContestData.name}
+                      entries={top3Entries.map(entry => ({
+                        rank: entry.rank,
+                        username: entry.profile?.username || 'Anonymous',
+                        score: entry.score || 0,
+                        timeTaken: formatTime(entry.time_taken_seconds as number),
+                        avatarUrl: entry.profile?.avatar_url,
+                      }))}
+                    />
+                  </DialogContent>
+                </Dialog>
+              </div>
+            )}
 
             {/* Top 3 Share Buttons (for admin or for the user's own entry) */}
             {selectedContestData && top3Entries.length > 0 && (
