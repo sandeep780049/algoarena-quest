@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
-import type { Contest, Question } from '@/lib/supabase';
+import type { Contest } from '@/lib/supabase';
 import { 
   ChevronLeft, 
   ChevronRight,
@@ -18,11 +18,35 @@ import {
 } from 'lucide-react';
 import { addMinutes, differenceInSeconds } from 'date-fns';
 
+interface QuizQuestion {
+  id: string;
+  question_text: string;
+  code_block: string | null;
+  options: string[];
+}
+
 interface QuizResult {
   score: number;
   totalQuestions: number;
   percentage: number;
   timeTaken: number;
+}
+
+interface MyContestResultResponse {
+  score: number;
+  total_questions: number;
+  time_taken_seconds: number;
+  completed_at: string;
+}
+
+interface SubmitQuizResponse {
+  success?: boolean;
+  error?: string;
+  already_submitted?: boolean;
+  score?: number;
+  total_questions?: number;
+  time_taken_seconds?: number;
+  percentage?: number;
 }
 
 export default function Quiz() {
@@ -32,7 +56,7 @@ export default function Quiz() {
   const { toast } = useToast();
   
   const [contest, setContest] = useState<Contest | null>(null);
-  const [questions, setQuestions] = useState<Question[]>([]);
+  const [questions, setQuestions] = useState<QuizQuestion[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
@@ -113,15 +137,13 @@ export default function Quiz() {
         return;
       }
 
-      // Check if user has COMPLETED this contest (has completed_at set)
+      // Check if user has COMPLETED this contest using secure function
       if (user) {
-        const { data: existingResult } = await supabase
-          .from('contest_results')
-          .select('*')
-          .eq('contest_id', id)
-          .eq('user_id', user.id)
-          .not('completed_at', 'is', null)
-          .maybeSingle();
+        const { data: existingResultData } = await supabase.rpc('get_my_contest_result', {
+          p_contest_id: id
+        });
+
+        const existingResult = existingResultData as unknown as MyContestResultResponse | null;
 
         if (existingResult) {
           // User has already submitted - show their result
@@ -139,7 +161,7 @@ export default function Quiz() {
         }
       }
 
-      // Fetch questions with correct_answer for scoring
+      // Fetch questions WITHOUT correct_answer - SECURITY: Never expose answers to frontend
       const { data: cqData } = await supabase
         .from('contest_questions')
         .select('question_id, order_index')
@@ -148,15 +170,16 @@ export default function Quiz() {
 
       if (cqData && cqData.length > 0) {
         const questionIds = cqData.map(cq => cq.question_id);
+        // SECURITY: Only select safe fields - NO correct_answer
         const { data: questionsData } = await supabase
           .from('questions')
-          .select('id, question_text, code_block, options, correct_answer')
+          .select('id, question_text, code_block, options')
           .in('id', questionIds);
         
         if (questionsData) {
           const sortedQuestions = questionIds.map(qid => 
             questionsData.find(q => q.id === qid)
-          ).filter(Boolean) as Question[];
+          ).filter(Boolean) as QuizQuestion[];
           setQuestions(sortedQuestions);
         }
       }
@@ -178,8 +201,7 @@ export default function Quiz() {
         }
       }
 
-      // Set start time - DON'T create contest_results row here
-      // The row will only be created when user submits
+      // Set start time
       setStartedAt(new Date());
       
     } catch (error) {
@@ -194,27 +216,17 @@ export default function Quiz() {
     }
   };
 
+  // Save answer using secure server-side function
   const saveAnswer = async (questionId: string, answerIndex: number) => {
     if (!user || !contest) return;
 
-    // Find the question to check correct answer
-    const question = questions.find(q => q.id === questionId);
-    if (!question) return;
-
-    // Compare as integers - both should be 0-based indices
-    const correctAnswer = Number(question.correct_answer);
-    const isCorrect = correctAnswer === answerIndex;
-
     try {
-      const { error } = await supabase
-        .from('submissions')
-        .upsert({
-          user_id: user.id,
-          contest_id: contest.id,
-          question_id: questionId,
-          selected_answer: answerIndex,
-          is_correct: isCorrect,
-        });
+      // Use secure RPC function - server validates and saves without exposing correct answer
+      const { data, error } = await supabase.rpc('save_quiz_answer', {
+        p_contest_id: contest.id,
+        p_question_id: questionId,
+        p_selected_answer: answerIndex
+      });
       
       if (error) {
         console.error('Error saving answer:', error);
@@ -244,24 +256,30 @@ export default function Quiz() {
     setSubmitting(true);
 
     try {
-      // FIRST: Check if user has already completed this contest
-      const { data: existingResult } = await supabase
-        .from('contest_results')
-        .select('*')
-        .eq('contest_id', contest.id)
-        .eq('user_id', user.id)
-        .not('completed_at', 'is', null)
-        .maybeSingle();
+      // Use secure server-side function to submit and calculate score
+      const { data: responseData, error } = await supabase.rpc('submit_quiz_answers', {
+        p_contest_id: contest.id,
+        p_answers: answers,
+        p_started_at: startedAt?.toISOString() || new Date().toISOString()
+      });
 
-      if (existingResult) {
-        // Already submitted - show existing result without error
+      if (error) throw error;
+
+      const data = responseData as SubmitQuizResponse | null;
+
+      if (data?.error) {
+        throw new Error(data.error);
+      }
+
+      if (data?.already_submitted) {
+        // Already submitted - show existing result
         setQuizResult({
-          score: existingResult.score || 0,
-          totalQuestions: existingResult.total_questions || 0,
-          percentage: existingResult.total_questions 
-            ? Math.round((existingResult.score || 0) / existingResult.total_questions * 100) 
+          score: data.score || 0,
+          totalQuestions: data.total_questions || 0,
+          percentage: data.total_questions 
+            ? Math.round((data.score || 0) / data.total_questions * 100) 
             : 0,
-          timeTaken: existingResult.time_taken_seconds || 0,
+          timeTaken: data.time_taken_seconds || 0,
         });
         setHasCompleted(true);
         toast({
@@ -271,96 +289,21 @@ export default function Quiz() {
         return;
       }
 
-      // Calculate score by comparing with correct answers
-      let score = 0;
-      
-      for (const question of questions) {
-        const userAnswer = answers[question.id];
-        const correctAnswer = Number(question.correct_answer);
-        
-        if (userAnswer !== undefined && userAnswer === correctAnswer) {
-          score++;
-        }
-      }
-
-      const timeTaken = startedAt 
-        ? Math.floor((new Date().getTime() - startedAt.getTime()) / 1000)
-        : 0;
-
-      // Update all submissions with correct is_correct values
-      for (const question of questions) {
-        const userAnswer = answers[question.id];
-        if (userAnswer !== undefined) {
-          const correctAnswer = Number(question.correct_answer);
-          await supabase
-            .from('submissions')
-            .upsert({
-              user_id: user.id,
-              contest_id: contest.id,
-              question_id: question.id,
-              selected_answer: userAnswer,
-              is_correct: userAnswer === correctAnswer,
-            });
-        }
-      }
-
-      // Now create/update the contest_results row
-      // Check if there's an existing incomplete row first
-      const { data: incompleteResult } = await supabase
-        .from('contest_results')
-        .select('id')
-        .eq('contest_id', contest.id)
-        .eq('user_id', user.id)
-        .is('completed_at', null)
-        .maybeSingle();
-
-      let resultError = null;
-
-      if (incompleteResult) {
-        // Update the existing incomplete row
-        const { error } = await supabase
-          .from('contest_results')
-          .update({
-            score,
-            total_questions: questions.length,
-            time_taken_seconds: timeTaken,
-            completed_at: new Date().toISOString(),
-          })
-          .eq('id', incompleteResult.id);
-        resultError = error;
-      } else {
-        // Insert a new row with all data
-        const { error } = await supabase
-          .from('contest_results')
-          .insert({
-            user_id: user.id,
-            contest_id: contest.id,
-            score,
-            total_questions: questions.length,
-            time_taken_seconds: timeTaken,
-            completed_at: new Date().toISOString(),
-            started_at: startedAt?.toISOString() || new Date().toISOString(),
-          });
-        resultError = error;
-      }
-
-      if (resultError) throw resultError;
-
-      const percentage = questions.length > 0 
-        ? Math.round((score / questions.length) * 100) 
+      const percentage = (data?.total_questions || 0) > 0 
+        ? Math.round(((data?.score || 0) / (data?.total_questions || 1)) * 100) 
         : 0;
 
       setQuizResult({
-        score,
-        totalQuestions: questions.length,
+        score: data?.score || 0,
+        totalQuestions: data?.total_questions || 0,
         percentage,
-        timeTaken,
+        timeTaken: data?.time_taken_seconds || 0,
       });
       setHasCompleted(true);
 
       toast({
         title: 'Quiz submitted!',
-        description: `You scored ${score} out of ${questions.length} (${percentage}%)`,
+        description: `You scored ${data?.score || 0} out of ${data?.total_questions || 0} (${percentage}%)`,
       });
     } catch (error) {
       console.error('Error submitting quiz:', error);
@@ -374,7 +317,7 @@ export default function Quiz() {
     } finally {
       setSubmitting(false);
     }
-  }, [user, contest, startedAt, questions, answers, quizResult, hasCompleted, toast]);
+  }, [user, contest, startedAt, answers, quizResult, hasCompleted, toast]);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -504,101 +447,109 @@ export default function Quiz() {
         </div>
       </header>
 
-      {/* Main Content */}
-      <main className="container mx-auto px-4 py-8 max-w-4xl">
-        {/* Question Navigator */}
-        <div className="flex flex-wrap gap-2 mb-8">
-          {questions.map((q, idx) => (
-            <button
-              key={q.id}
-              onClick={() => setCurrentIndex(idx)}
-              className={`w-10 h-10 rounded-lg text-sm font-medium transition-all ${
-                idx === currentIndex
-                  ? 'bg-primary text-primary-foreground'
-                  : answers[q.id] !== undefined
-                  ? 'bg-emerald-500/20 text-emerald-500 border border-emerald-500/30'
-                  : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
-              }`}
-            >
-              {idx + 1}
-            </button>
-          ))}
-        </div>
-
-        {/* Question Card */}
-        <div className="bg-card border border-border rounded-xl p-6 md:p-8 mb-8">
-          <div className="flex items-center gap-2 mb-4">
-            <Badge variant="outline">Question {currentIndex + 1}</Badge>
-          </div>
-
-          <h2 className="text-xl font-semibold mb-6">{currentQuestion.question_text}</h2>
-
-          {/* Code Block */}
-          {currentQuestion.code_block && (
-            <div className="code-block mb-6">
-              <pre className="whitespace-pre-wrap">
-                <code>{currentQuestion.code_block}</code>
-              </pre>
-            </div>
-          )}
-
-          {/* Options */}
-          <div className="space-y-3">
-            {options.map((option, idx) => (
-              <button
-                key={idx}
-                onClick={() => selectAnswer(idx)}
-                className={`w-full text-left p-4 rounded-lg border transition-all ${
-                  answers[currentQuestion.id] === idx
-                    ? 'bg-primary/10 border-primary text-foreground'
-                    : 'bg-secondary/50 border-border hover:border-primary/50 hover:bg-secondary'
+      <div className="container mx-auto px-4 py-8">
+        <div className="max-w-3xl mx-auto">
+          {/* Question Navigation */}
+          <div className="flex flex-wrap gap-2 mb-8">
+            {questions.map((q, idx) => (
+              <Button
+                key={q.id}
+                variant={currentIndex === idx ? 'default' : 'outline'}
+                size="sm"
+                className={`w-10 h-10 p-0 ${
+                  answers[q.id] !== undefined 
+                    ? 'bg-primary/20 border-primary' 
+                    : ''
                 }`}
+                onClick={() => setCurrentIndex(idx)}
               >
-                <div className="flex items-center gap-3">
-                  <span className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
-                    answers[currentQuestion.id] === idx
-                      ? 'bg-primary text-primary-foreground'
-                      : 'bg-muted text-muted-foreground'
-                  }`}>
-                    {String.fromCharCode(65 + idx)}
-                  </span>
-                  <span className="font-mono">{option}</span>
-                </div>
-              </button>
+                {idx + 1}
+              </Button>
             ))}
           </div>
+
+          {/* Question Card */}
+          <div className="bg-card border border-border rounded-xl p-6 mb-6">
+            <div className="flex items-center justify-between mb-6">
+              <Badge variant="secondary">Question {currentIndex + 1}</Badge>
+              {answers[currentQuestion.id] !== undefined && (
+                <Badge variant="outline" className="bg-primary/10 text-primary border-primary/30">
+                  <Flag className="h-3 w-3 mr-1" />
+                  Answered
+                </Badge>
+              )}
+            </div>
+
+            <h2 className="text-lg md:text-xl font-medium mb-6">
+              {currentQuestion.question_text}
+            </h2>
+
+            {currentQuestion.code_block && (
+              <pre className="bg-secondary p-4 rounded-lg mb-6 overflow-x-auto text-sm font-mono">
+                <code>{currentQuestion.code_block}</code>
+              </pre>
+            )}
+
+            <div className="space-y-3">
+              {options.map((option, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => selectAnswer(idx)}
+                  className={`w-full text-left p-4 rounded-lg border transition-all ${
+                    answers[currentQuestion.id] === idx
+                      ? 'bg-primary/10 border-primary text-primary'
+                      : 'bg-secondary border-border hover:border-primary/50'
+                  }`}
+                >
+                  <span className="inline-flex items-center gap-3">
+                    <span className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
+                      answers[currentQuestion.id] === idx
+                        ? 'bg-primary text-primary-foreground'
+                        : 'bg-background'
+                    }`}>
+                      {String.fromCharCode(65 + idx)}
+                    </span>
+                    {option}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Navigation */}
+          <div className="flex items-center justify-between">
+            <Button
+              variant="outline"
+              onClick={() => setCurrentIndex(prev => Math.max(0, prev - 1))}
+              disabled={currentIndex === 0}
+            >
+              <ChevronLeft className="h-4 w-4 mr-2" />
+              Previous
+            </Button>
+
+            <div className="flex gap-2">
+              {currentIndex === questions.length - 1 && (
+                <Button 
+                  onClick={handleSubmit}
+                  disabled={submitting}
+                  className="bg-primary"
+                >
+                  {submitting ? 'Submitting...' : 'Submit Quiz'}
+                </Button>
+              )}
+            </div>
+
+            <Button
+              variant="outline"
+              onClick={() => setCurrentIndex(prev => Math.min(questions.length - 1, prev + 1))}
+              disabled={currentIndex === questions.length - 1}
+            >
+              Next
+              <ChevronRight className="h-4 w-4 ml-2" />
+            </Button>
+          </div>
         </div>
-
-        {/* Navigation */}
-        <div className="flex items-center justify-between">
-          <Button
-            variant="outline"
-            onClick={() => setCurrentIndex(prev => Math.max(0, prev - 1))}
-            disabled={currentIndex === 0}
-          >
-            <ChevronLeft className="h-4 w-4 mr-2" />
-            Previous
-          </Button>
-
-          <Button
-            variant="destructive"
-            onClick={handleSubmit}
-            disabled={submitting}
-          >
-            <Flag className="h-4 w-4 mr-2" />
-            {submitting ? 'Submitting...' : 'Submit Quiz'}
-          </Button>
-
-          <Button
-            variant="outline"
-            onClick={() => setCurrentIndex(prev => Math.min(questions.length - 1, prev + 1))}
-            disabled={currentIndex === questions.length - 1}
-          >
-            Next
-            <ChevronRight className="h-4 w-4 ml-2" />
-          </Button>
-        </div>
-      </main>
+      </div>
     </div>
   );
 }

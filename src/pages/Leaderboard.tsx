@@ -28,9 +28,32 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 
-interface LeaderboardEntry extends ContestResult {
-  profile: Profile;
+interface LeaderboardEntry {
+  user_id: string;
   rank: number;
+  score: number | null;
+  total_questions: number | null;
+  time_taken_seconds: number | null;
+  profile: Profile | null;
+}
+
+interface LeaderboardRpcEntry {
+  rank: number;
+  user_id: string;
+  username: string;
+  avatar_url: string | null;
+  score: number;
+  total_questions: number;
+  time_taken_seconds: number;
+}
+
+interface GlobalLeaderboardRpcEntry {
+  rank: number;
+  user_id: string;
+  username: string;
+  avatar_url: string | null;
+  total_score: number;
+  contest_count: number;
 }
 
 function getContestStatus(contest: Contest): 'upcoming' | 'live' | 'ended' {
@@ -90,31 +113,31 @@ export default function Leaderboard() {
   const fetchLeaderboard = async (contestId: string) => {
     setLoading(true);
     try {
-      const { data: resultsData } = await supabase
-        .from('contest_results')
-        .select('*')
-        .eq('contest_id', contestId)
-        .not('completed_at', 'is', null)
-        .order('score', { ascending: false })
-        .order('time_taken_seconds', { ascending: true })
-        .limit(100);
+      // Use secure RPC function to get leaderboard data
+      const { data: rpcData, error } = await supabase.rpc('get_leaderboard_entries', {
+        p_contest_id: contestId
+      });
+
+      if (error) throw error;
+
+      const resultsData = rpcData as unknown as LeaderboardRpcEntry[] | null;
 
       if (resultsData && resultsData.length > 0) {
-        const userIds = resultsData.map(r => r.user_id);
-        const { data: profilesData } = await supabase
-          .from('profiles')
-          .select('*')
-          .in('id', userIds);
-
-        const profileMap: Record<string, any> = {};
-        profilesData?.forEach(p => { profileMap[p.id] = p; });
-
-        const ranked = resultsData.map((entry: any, idx: number) => ({
-          ...entry,
-          profile: profileMap[entry.user_id],
-          rank: idx + 1,
+        const entries: LeaderboardEntry[] = resultsData.map(entry => ({
+          user_id: entry.user_id,
+          rank: entry.rank,
+          score: entry.score,
+          total_questions: entry.total_questions,
+          time_taken_seconds: entry.time_taken_seconds,
+          profile: {
+            id: entry.user_id,
+            username: entry.username,
+            avatar_url: entry.avatar_url,
+            created_at: '',
+            updated_at: '',
+          } as Profile,
         }));
-        setEntries(ranked);
+        setEntries(entries);
       } else {
         setEntries([]);
       }
@@ -128,46 +151,29 @@ export default function Leaderboard() {
   const fetchGlobalLeaderboard = async () => {
     setLoading(true);
     try {
-      const { data: resultsData } = await supabase
-        .from('contest_results')
-        .select('user_id, score')
-        .not('completed_at', 'is', null);
+      // Use secure RPC function to get global leaderboard
+      const { data: rpcData, error } = await supabase.rpc('get_global_leaderboard');
+
+      if (error) throw error;
+
+      const resultsData = rpcData as unknown as GlobalLeaderboardRpcEntry[] | null;
 
       if (resultsData && resultsData.length > 0) {
-        const userScores: Record<string, { total: number; count: number }> = {};
-        
-        resultsData.forEach((entry: any) => {
-          if (!userScores[entry.user_id]) {
-            userScores[entry.user_id] = { total: 0, count: 0 };
-          }
-          userScores[entry.user_id].total += entry.score || 0;
-          userScores[entry.user_id].count += 1;
-        });
-
-        const userIds = Object.keys(userScores);
-        const { data: profilesData } = await supabase
-          .from('profiles')
-          .select('*')
-          .in('id', userIds);
-
-        const profileMap: Record<string, any> = {};
-        profilesData?.forEach(p => { profileMap[p.id] = p; });
-
-        const sorted = Object.entries(userScores)
-          .map(([userId, data]) => ({
-            user_id: userId,
-            score: data.total,
-            total_questions: data.count,
-            profile: profileMap[userId],
-          }))
-          .sort((a, b) => b.score - a.score)
-          .slice(0, 100)
-          .map((entry, idx) => ({
-            ...entry,
-            rank: idx + 1,
-          }));
-
-        setEntries(sorted as any);
+        const entries: LeaderboardEntry[] = resultsData.map(entry => ({
+          user_id: entry.user_id,
+          rank: entry.rank,
+          score: entry.total_score,
+          total_questions: entry.contest_count,
+          time_taken_seconds: null,
+          profile: {
+            id: entry.user_id,
+            username: entry.username,
+            avatar_url: entry.avatar_url,
+            created_at: '',
+            updated_at: '',
+          } as Profile,
+        }));
+        setEntries(entries);
       } else {
         setEntries([]);
       }

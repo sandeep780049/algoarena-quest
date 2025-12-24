@@ -308,6 +308,30 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_global_leaderboard: {
+        Args: never
+        Returns: {
+          avatar_url: string
+          contest_count: number
+          rank: number
+          total_score: number
+          user_id: string
+          username: string
+        }[]
+      }
+      get_leaderboard_entries: {
+        Args: { p_contest_id: string }
+        Returns: {
+          avatar_url: string
+          rank: number
+          score: number
+          time_taken_seconds: number
+          total_questions: number
+          user_id: string
+          username: string
+        }[]
+      }
+      get_my_contest_result: { Args: { p_contest_id: string }; Returns: Json }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -316,6 +340,18 @@ export type Database = {
         Returns: boolean
       }
       is_admin: { Args: never; Returns: boolean }
+      save_quiz_answer: {
+        Args: {
+          p_contest_id: string
+          p_question_id: string
+          p_selected_answer: number
+        }
+        Returns: Json
+      }
+      submit_quiz_answers: {
+        Args: { p_answers: Json; p_contest_id: string; p_started_at: string }
+        Returns: Json
+      }
     }
     Enums: {
       app_role: "admin" | "user"
