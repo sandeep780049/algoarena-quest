@@ -6,7 +6,14 @@ import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
-import type { Contest, Question, ContestResult } from '@/lib/supabase';
+import type { Contest, Question } from '@/lib/supabase';
+
+interface MyContestResultResponse {
+  score: number;
+  total_questions: number;
+  time_taken_seconds: number;
+  completed_at: string;
+}
 import { 
   Clock, 
   Calendar, 
@@ -43,7 +50,7 @@ export default function ContestDetail() {
   const [loading, setLoading] = useState(true);
   const [isRegistered, setIsRegistered] = useState(false);
   const [registrationCount, setRegistrationCount] = useState(0);
-  const [userResult, setUserResult] = useState<ContestResult | null>(null);
+  const [userResult, setUserResult] = useState<MyContestResultResponse | null>(null);
   const [timeRemaining, setTimeRemaining] = useState<string>('');
   const [registering, setRegistering] = useState(false);
 
@@ -145,17 +152,13 @@ export default function ContestDetail() {
         
         setIsRegistered(!!regData);
 
-        // Only fetch COMPLETED results (with completed_at set)
-        const { data: resultData } = await supabase
-          .from('contest_results')
-          .select('*')
-          .eq('contest_id', id)
-          .eq('user_id', user.id)
-          .not('completed_at', 'is', null)
-          .maybeSingle();
+        // Use secure RPC function to get user's own result
+        const { data: resultData } = await supabase.rpc('get_my_contest_result', {
+          p_contest_id: id
+        });
         
         if (resultData) {
-          setUserResult(resultData as ContestResult);
+          setUserResult(resultData as unknown as MyContestResultResponse);
         }
       }
     } catch (error) {
