@@ -170,11 +170,17 @@ export default function Quiz() {
       }
       
       if (questionsData && questionsData.length > 0) {
-        const formattedQuestions: QuizQuestion[] = questionsData.map((q: { id: string; question_text: string; code_block: string | null; options: string[] }) => ({
+        // Cast to unknown first to handle Json type from RPC response
+        const formattedQuestions: QuizQuestion[] = (questionsData as unknown as Array<{
+          id: string;
+          question_text: string;
+          code_block: string | null;
+          options: string[];
+        }>).map((q) => ({
           id: q.id,
           question_text: q.question_text,
           code_block: q.code_block,
-          options: q.options as string[]
+          options: Array.isArray(q.options) ? q.options : []
         }));
         setQuestions(formattedQuestions);
       }

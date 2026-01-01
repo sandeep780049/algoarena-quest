@@ -319,6 +319,10 @@ export type Database = {
           tags: string[]
         }[]
       }
+      get_contest_registration_count: {
+        Args: { p_contest_id: string }
+        Returns: number
+      }
       get_global_leaderboard: {
         Args: never
         Returns: {
@@ -351,6 +355,7 @@ export type Database = {
         Returns: boolean
       }
       is_admin: { Args: never; Returns: boolean }
+      is_user_registered: { Args: { p_contest_id: string }; Returns: boolean }
       save_quiz_answer: {
         Args: {
           p_contest_id: string
