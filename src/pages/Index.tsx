@@ -141,19 +141,16 @@ export default function Index() {
         return;
       }
 
-      // Fetch registration counts - use any since table was just created
-      const { data: regCounts } = await (supabase as any)
-        .from('contest_registrations')
-        .select('contest_id');
+      // Fetch registration counts using secure RPC functions
+      const countsResults = await Promise.all(
+        contestsData.map(c => 
+          supabase.rpc('get_contest_registration_count', { p_contest_id: c.id })
+        )
+      );
 
-      const countMap: Record<string, number> = {};
-      (regCounts as any[])?.forEach((r: any) => {
-        countMap[r.contest_id] = (countMap[r.contest_id] || 0) + 1;
-      });
-
-      const contestsWithCounts = contestsData.map(c => ({
+      const contestsWithCounts = contestsData.map((c, i) => ({
         ...c,
-        registration_count: countMap[c.id] || 0,
+        registration_count: countsResults[i].data || 0,
       })) as ContestWithCount[];
 
       // Categorize by status and type
