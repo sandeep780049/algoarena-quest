@@ -133,24 +133,19 @@ export default function ContestDetail() {
         }
       }
 
-      // Fetch registration count - use any since table was just created
-      const { count } = await (supabase as any)
-        .from('contest_registrations')
-        .select('*', { count: 'exact', head: true })
-        .eq('contest_id', id);
-      
-      setRegistrationCount(count || 0);
+      // Use secure RPC function for registration count
+      const { data: regCount } = await supabase.rpc('get_contest_registration_count', {
+        p_contest_id: id
+      });
+      setRegistrationCount(regCount || 0);
 
       // Check user registration and result
       if (user) {
-        const { data: regData } = await (supabase as any)
-          .from('contest_registrations')
-          .select('id')
-          .eq('contest_id', id)
-          .eq('user_id', user.id)
-          .maybeSingle();
-        
-        setIsRegistered(!!regData);
+        // Use secure RPC function for user registration status
+        const { data: isReg } = await supabase.rpc('is_user_registered', {
+          p_contest_id: id
+        });
+        setIsRegistered(isReg || false);
 
         // Use secure RPC function to get user's own result
         const { data: resultData } = await supabase.rpc('get_my_contest_result', {

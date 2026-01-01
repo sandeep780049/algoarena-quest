@@ -172,48 +172,44 @@ export default function Contests() {
 
       if (error) throw error;
 
-      const contestsWithMeta: ContestWithMeta[] = [];
+      // Fetch all registration counts and user statuses in parallel
+      const contestsWithMeta: ContestWithMeta[] = await Promise.all(
+        (contestsData || []).map(async (contest) => {
+          // Use secure RPC function for registration count
+          const { data: count } = await supabase.rpc('get_contest_registration_count', {
+            p_contest_id: contest.id
+          });
 
-      for (const contest of (contestsData || []) as Contest[]) {
-        // Get registration count
-        const { count } = await (supabase as any)
-          .from('contest_registrations')
-          .select('*', { count: 'exact', head: true })
-          .eq('contest_id', contest.id);
+          let isRegistered = false;
+          let hasCompleted = false;
 
-        let isRegistered = false;
-        let hasCompleted = false;
+          if (user) {
+            // Use secure RPC function for user registration status
+            const { data: isReg } = await supabase.rpc('is_user_registered', {
+              p_contest_id: contest.id
+            });
+            isRegistered = isReg || false;
 
-        if (user) {
-          // Check if user is registered
-          const { data: regData } = await (supabase as any)
-            .from('contest_registrations')
-            .select('id')
-            .eq('contest_id', contest.id)
-            .eq('user_id', user.id)
-            .maybeSingle();
-          
-          isRegistered = !!regData;
+            // Check if user has completed
+            const { data: resultData } = await supabase
+              .from('contest_results')
+              .select('id')
+              .eq('contest_id', contest.id)
+              .eq('user_id', user.id)
+              .not('completed_at', 'is', null)
+              .maybeSingle();
+            
+            hasCompleted = !!resultData;
+          }
 
-          // Check if user has completed
-          const { data: resultData } = await supabase
-            .from('contest_results')
-            .select('id')
-            .eq('contest_id', contest.id)
-            .eq('user_id', user.id)
-            .not('completed_at', 'is', null)
-            .maybeSingle();
-          
-          hasCompleted = !!resultData;
-        }
-
-        contestsWithMeta.push({
-          ...contest,
-          registrationCount: count || 0,
-          isRegistered,
-          hasCompleted,
-        });
-      }
+          return {
+            ...contest,
+            registrationCount: count || 0,
+            isRegistered,
+            hasCompleted,
+          } as ContestWithMeta;
+        })
+      );
 
       setContests(contestsWithMeta);
     } catch (error) {
