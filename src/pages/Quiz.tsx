@@ -169,18 +169,13 @@ export default function Quiz() {
         throw new Error(questionsError.message);
       }
       
-      if (questionsData && questionsData.length > 0) {
-        // Cast to unknown first to handle Json type from RPC response
-        const formattedQuestions: QuizQuestion[] = (questionsData as unknown as Array<{
-          id: string;
-          question_text: string;
-          code_block: string | null;
-          options: string[];
-        }>).map((q) => ({
-          id: q.id,
-          question_text: q.question_text,
-          code_block: q.code_block,
-          options: Array.isArray(q.options) ? q.options : []
+      if (questionsData && Array.isArray(questionsData) && questionsData.length > 0) {
+        // Properly handle the RPC response with Json types
+        const formattedQuestions: QuizQuestion[] = questionsData.map((q) => ({
+          id: q.id as string,
+          question_text: q.question_text as string,
+          code_block: q.code_block as string | null,
+          options: (Array.isArray(q.options) ? q.options : []) as string[]
         }));
         setQuestions(formattedQuestions);
       }
