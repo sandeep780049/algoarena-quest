@@ -12,6 +12,26 @@ import { supabase } from '@/lib/supabase';
 import type { Question, Contest } from '@/lib/supabase';
 import { Plus, Edit, Trash2, Save, X, Settings, Trophy, FileText, ChevronRight } from 'lucide-react';
 import { format } from 'date-fns';
+import { z } from 'zod';
+
+// Validation schemas for admin forms
+const questionSchema = z.object({
+  questionText: z.string().trim().min(1, "Question text is required").max(1000, "Question text must be under 1000 characters"),
+  codeBlock: z.string().max(5000, "Code block must be under 5000 characters").optional(),
+  options: z.array(z.string().trim().min(1, "Option cannot be empty").max(500, "Option must be under 500 characters")).length(4, "Exactly 4 options required"),
+  correctAnswer: z.number().min(0).max(3),
+  explanation: z.string().max(2000, "Explanation must be under 2000 characters").optional(),
+});
+
+const contestSchema = z.object({
+  contestName: z.string().trim().min(1, "Contest name is required").max(200, "Contest name must be under 200 characters"),
+  contestDesc: z.string().max(1000, "Description must be under 1000 characters").optional(),
+  contestCode: z.string().trim().min(1, "Contest code is required").max(50, "Contest code must be under 50 characters").regex(/^[A-Za-z0-9_-]+$/, "Contest code can only contain letters, numbers, hyphens, and underscores"),
+  contestType: z.enum(['daily', 'weekly', 'special']),
+  startTime: z.string().min(1, "Start time is required"),
+  duration: z.number().min(1, "Duration must be at least 1 minute").max(480, "Duration cannot exceed 8 hours"),
+  selectedQuestions: z.array(z.string().uuid()).optional(),
+});
 
 export default function Admin() {
   const { user, isAdmin, loading: authLoading } = useAuth();
@@ -77,10 +97,29 @@ export default function Admin() {
   };
 
   const saveQuestion = async () => {
-    if (!questionText || options.some(o => !o)) {
-      toast({ title: 'Error', description: 'Fill all required fields.', variant: 'destructive' }); return;
+    // Validate with Zod schema
+    const validation = questionSchema.safeParse({
+      questionText,
+      codeBlock: codeBlock || undefined,
+      options,
+      correctAnswer,
+      explanation: explanation || undefined,
+    });
+
+    if (!validation.success) {
+      const firstError = validation.error.errors[0];
+      toast({ title: 'Validation Error', description: firstError.message, variant: 'destructive' });
+      return;
     }
-    const data = { question_text: questionText, code_block: codeBlock || null, options, correct_answer: correctAnswer, explanation: explanation || null, created_by: user?.id };
+
+    const data = { 
+      question_text: validation.data.questionText, 
+      code_block: validation.data.codeBlock || null, 
+      options: validation.data.options, 
+      correct_answer: validation.data.correctAnswer, 
+      explanation: validation.data.explanation || null, 
+      created_by: user?.id 
+    };
     
     if (editingQuestion) {
       await supabase.from('questions').update(data).eq('id', editingQuestion.id);
@@ -98,11 +137,32 @@ export default function Admin() {
   };
 
   const saveContest = async () => {
-    if (!contestName || !contestCode || !startTime) {
-      toast({ title: 'Error', description: 'Fill all required fields.', variant: 'destructive' }); return;
+    // Validate with Zod schema
+    const validation = contestSchema.safeParse({
+      contestName,
+      contestDesc: contestDesc || undefined,
+      contestCode,
+      contestType,
+      startTime,
+      duration,
+      selectedQuestions: selectedQuestions.length > 0 ? selectedQuestions : undefined,
+    });
+
+    if (!validation.success) {
+      const firstError = validation.error.errors[0];
+      toast({ title: 'Validation Error', description: firstError.message, variant: 'destructive' });
+      return;
     }
     
-    const contestData = { name: contestName, description: contestDesc || null, contest_type: contestType, contest_code: contestCode, start_time: new Date(startTime).toISOString(), duration_minutes: duration, created_by: user?.id };
+    const contestData = { 
+      name: validation.data.contestName, 
+      description: validation.data.contestDesc || null, 
+      contest_type: validation.data.contestType, 
+      contest_code: validation.data.contestCode, 
+      start_time: new Date(validation.data.startTime).toISOString(), 
+      duration_minutes: validation.data.duration, 
+      created_by: user?.id 
+    };
     
     let contestId = editingContest?.id;
     if (editingContest) {
