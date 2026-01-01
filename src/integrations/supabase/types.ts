@@ -308,6 +308,17 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_contest_questions: {
+        Args: { p_contest_id: string }
+        Returns: {
+          code_block: string
+          difficulty: string
+          id: string
+          options: Json
+          question_text: string
+          tags: string[]
+        }[]
+      }
       get_global_leaderboard: {
         Args: never
         Returns: {
