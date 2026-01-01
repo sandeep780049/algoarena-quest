@@ -161,27 +161,22 @@ export default function Quiz() {
         }
       }
 
-      // Fetch questions WITHOUT correct_answer - SECURITY: Never expose answers to frontend
-      const { data: cqData } = await supabase
-        .from('contest_questions')
-        .select('question_id, order_index')
-        .eq('contest_id', id)
-        .order('order_index');
+      // SECURITY: Use secure RPC function that never exposes correct_answer
+      const { data: questionsData, error: questionsError } = await supabase
+        .rpc('get_contest_questions', { p_contest_id: id });
 
-      if (cqData && cqData.length > 0) {
-        const questionIds = cqData.map(cq => cq.question_id);
-        // SECURITY: Only select safe fields - NO correct_answer
-        const { data: questionsData } = await supabase
-          .from('questions')
-          .select('id, question_text, code_block, options')
-          .in('id', questionIds);
-        
-        if (questionsData) {
-          const sortedQuestions = questionIds.map(qid => 
-            questionsData.find(q => q.id === qid)
-          ).filter(Boolean) as QuizQuestion[];
-          setQuestions(sortedQuestions);
-        }
+      if (questionsError) {
+        throw new Error(questionsError.message);
+      }
+      
+      if (questionsData && questionsData.length > 0) {
+        const formattedQuestions: QuizQuestion[] = questionsData.map((q: { id: string; question_text: string; code_block: string | null; options: string[] }) => ({
+          id: q.id,
+          question_text: q.question_text,
+          code_block: q.code_block,
+          options: q.options as string[]
+        }));
+        setQuestions(formattedQuestions);
       }
 
       // Load existing answers from submissions (in case user refreshed)
