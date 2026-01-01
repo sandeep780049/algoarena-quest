@@ -34,15 +34,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       
       setProfile(profileData);
 
-      const { data: roleData } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', userId)
-        .maybeSingle();
+      // Use the secure server-side is_admin() RPC function for admin verification
+      // This prevents client-side manipulation of admin status
+      const { data: isAdminResult } = await supabase.rpc('is_admin');
       
-      setIsAdmin(roleData?.role === 'admin');
+      setIsAdmin(isAdminResult === true);
     } catch (error) {
       console.error('Error fetching profile:', error);
+      setIsAdmin(false);
     }
   };
 
