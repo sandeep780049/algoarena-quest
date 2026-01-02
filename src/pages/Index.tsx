@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Layout } from '@/components/Layout';
+import { SEO } from '@/components/SEO';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/hooks/useAuth';
@@ -214,6 +215,11 @@ export default function Index() {
 
   return (
     <Layout>
+      <SEO 
+        title="Home"
+        description="JC AlgoArena - The ultimate coding quiz platform. Test your programming knowledge, compete in live contests, and climb the leaderboard."
+        path="/"
+      />
       {/* Hero Section */}
       <section className="relative overflow-hidden">
         <div className="absolute inset-0 bg-hero-gradient opacity-50" />

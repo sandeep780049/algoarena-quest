@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { Layout } from '@/components/Layout';
+import { SEO } from '@/components/SEO';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -235,6 +236,11 @@ export default function Leaderboard() {
 
   return (
     <Layout>
+      <SEO 
+        title="Leaderboard"
+        description="View global and contest-specific rankings on JC AlgoArena. See top performers, track your position, and compete for the top spot."
+        path="/leaderboard"
+      />
       <div className="container mx-auto px-4 py-12">
         {/* Header */}
         <div className="mb-8">
