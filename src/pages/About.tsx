@@ -1,9 +1,15 @@
 import { Layout } from '@/components/Layout';
+import { SEO } from '@/components/SEO';
 import { Terminal, Trophy, Users, Code2, Zap, Target } from 'lucide-react';
 
 export default function About() {
   return (
     <Layout>
+      <SEO 
+        title="About Us"
+        description="JC AlgoArena is a competitive coding platform with daily challenges, weekly contests, and global leaderboards. Sharpen your algorithmic skills."
+        path="/about"
+      />
       <div className="container mx-auto px-4 py-16 max-w-4xl">
         <div className="text-center mb-12">
           <div className="inline-flex items-center gap-3 mb-6">

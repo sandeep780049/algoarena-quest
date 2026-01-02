@@ -1,8 +1,14 @@
 import { Layout } from '@/components/Layout';
+import { SEO } from '@/components/SEO';
 
 export default function PrivacyPolicy() {
   return (
     <Layout>
+      <SEO 
+        title="Privacy Policy"
+        description="Learn how JC AlgoArena collects, uses, and protects your personal information. Your privacy matters to us."
+        path="/privacy"
+      />
       <div className="container mx-auto px-4 py-16 max-w-4xl">
         <h1 className="text-4xl font-bold mb-8">Privacy Policy</h1>
         

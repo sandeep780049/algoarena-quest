@@ -1,9 +1,15 @@
 import { Layout } from '@/components/Layout';
+import { SEO } from '@/components/SEO';
 import { Mail, Instagram, MessageCircle } from 'lucide-react';
 
 export default function Contact() {
   return (
     <Layout>
+      <SEO 
+        title="Contact Us"
+        description="Get in touch with JC AlgoArena. Email us at jccoderr@gmail.com or follow @jc_coder_ on Instagram for updates and support."
+        path="/contact"
+      />
       <div className="container mx-auto px-4 py-16 max-w-4xl">
         <div className="text-center mb-12">
           <h1 className="text-4xl font-bold mb-4">Contact Us</h1>

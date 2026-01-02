@@ -1,8 +1,14 @@
 import { Layout } from '@/components/Layout';
+import { SEO } from '@/components/SEO';
 
 export default function Terms() {
   return (
     <Layout>
+      <SEO 
+        title="Terms & Conditions"
+        description="Read the terms and conditions for using JC AlgoArena. Understand the rules for participating in coding contests."
+        path="/terms"
+      />
       <div className="container mx-auto px-4 py-16 max-w-4xl">
         <h1 className="text-4xl font-bold mb-8">Terms & Conditions</h1>
         
