@@ -206,24 +206,40 @@ export function Layout({ children }: LayoutProps) {
       {/* Footer */}
       <footer className="border-t border-border bg-background/50 mt-20">
         <div className="container mx-auto px-4 py-8">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-2">
-              <Terminal className="h-5 w-5 text-primary" />
-              <span className="text-sm text-muted-foreground">
-                JC AlgoArena • Inspired by{' '}
-                <a 
-                  href="https://www.instagram.com/jc_coder_" 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="text-primary hover:underline"
-                >
-                  @jc_coder_
-                </a>
-              </span>
+          <div className="flex flex-col gap-6">
+            <div className="flex flex-wrap justify-center gap-6 text-sm">
+              <Link to="/about" className="text-muted-foreground hover:text-primary transition-colors">
+                About Us
+              </Link>
+              <Link to="/contact" className="text-muted-foreground hover:text-primary transition-colors">
+                Contact
+              </Link>
+              <Link to="/privacy" className="text-muted-foreground hover:text-primary transition-colors">
+                Privacy Policy
+              </Link>
+              <Link to="/terms" className="text-muted-foreground hover:text-primary transition-colors">
+                Terms & Conditions
+              </Link>
             </div>
-            <p className="text-sm text-muted-foreground">
-              © 2024 JC AlgoArena. Level up your coding skills.
-            </p>
+            <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+              <div className="flex items-center gap-2">
+                <Terminal className="h-5 w-5 text-primary" />
+                <span className="text-sm text-muted-foreground">
+                  JC AlgoArena • Inspired by{' '}
+                  <a 
+                    href="https://www.instagram.com/jc_coder_" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="text-primary hover:underline"
+                  >
+                    @jc_coder_
+                  </a>
+                </span>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                © 2024 JC AlgoArena. Level up your coding skills.
+              </p>
+            </div>
           </div>
         </div>
       </footer>
