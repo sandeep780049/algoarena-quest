@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Layout } from '@/components/Layout';
+import { SEO } from '@/components/SEO';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -256,6 +257,11 @@ export default function Contests() {
 
   return (
     <Layout>
+      <SEO 
+        title="Contests"
+        description="Join live coding contests, daily challenges, and weekly competitions on JC AlgoArena. Compete against coders worldwide and climb the leaderboard."
+        path="/contests"
+      />
       <div className="container mx-auto px-4 py-12">
         {/* Header */}
         <div className="mb-8">

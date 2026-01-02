@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link, useParams } from 'react-router-dom';
 import { Layout } from '@/components/Layout';
+import { SEO } from '@/components/SEO';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -187,6 +188,11 @@ export default function Profile() {
 
   return (
     <Layout>
+      <SEO 
+        title={isOwnProfile ? "My Profile" : `${displayProfile.username}'s Profile`}
+        description={`View ${isOwnProfile ? 'your' : displayProfile.username + "'s"} contest history, stats, and rankings on JC AlgoArena.`}
+        path={isOwnProfile ? "/profile" : `/profile/${targetUserId}`}
+      />
       <div className="container mx-auto px-4 py-12">
         {/* Profile Header */}
         <div className="bg-card border border-border rounded-xl p-6 md:p-8 mb-8">
