@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useAuth } from '@/hooks/useAuth';
 import { AvatarUpload } from '@/components/profile/AvatarUpload';
+import { RankBadge, getRankBadgeInfo } from '@/components/leaderboard/RankBadge';
 import { supabase } from '@/lib/supabase';
 import type { ContestResult, Contest, Profile as ProfileType } from '@/lib/supabase';
 import { 
@@ -18,7 +19,8 @@ import {
   Star,
   Target,
   Award,
-  TrendingUp
+  TrendingUp,
+  FileText
 } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -30,6 +32,13 @@ interface UserStats {
   accuracy: number;
   totalQuestions: number;
   correctAnswers: number;
+  topFinishes: number; // Number of top 10 finishes
+  winnerFinishes: number; // Number of top 3 finishes
+}
+
+interface ContestRank {
+  contestId: string;
+  rank: number;
 }
 
 export default function Profile() {
@@ -38,7 +47,7 @@ export default function Profile() {
   const navigate = useNavigate();
   
   const [viewingProfile, setViewingProfile] = useState<ProfileType | null>(null);
-  const [results, setResults] = useState<(ContestResult & { contest?: Contest })[]>([]);
+  const [results, setResults] = useState<(ContestResult & { contest?: Contest; rank?: number })[]>([]);
   const [stats, setStats] = useState<UserStats>({
     totalContests: 0,
     totalScore: 0,
@@ -47,9 +56,12 @@ export default function Profile() {
     accuracy: 0,
     totalQuestions: 0,
     correctAnswers: 0,
+    topFinishes: 0,
+    winnerFinishes: 0,
   });
   const [loading, setLoading] = useState(true);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [contestRanks, setContestRanks] = useState<Record<string, number>>({});
 
   const isOwnProfile = !userId || userId === user?.id;
   const targetUserId = userId || user?.id;
@@ -117,8 +129,12 @@ export default function Profile() {
         const avgScore = totalScore / resultsData.length;
         const accuracy = totalQuestions > 0 ? (totalScore / totalQuestions) * 100 : 0;
 
-        // Calculate best rank (need to check leaderboard positions)
+        // Calculate best rank and top finishes
         let bestRank: number | null = null;
+        let topFinishes = 0;
+        let winnerFinishes = 0;
+        const ranksMap: Record<string, number> = {};
+        
         for (const result of resultsData) {
           const { data: rankData } = await supabase
             .from('contest_results')
@@ -130,11 +146,29 @@ export default function Profile() {
 
           if (rankData) {
             const userRank = rankData.findIndex(r => r.user_id === targetUserId) + 1;
-            if (userRank > 0 && (bestRank === null || userRank < bestRank)) {
-              bestRank = userRank;
+            if (userRank > 0) {
+              ranksMap[result.contest_id] = userRank;
+              if (bestRank === null || userRank < bestRank) {
+                bestRank = userRank;
+              }
+              if (userRank <= 10) {
+                topFinishes++;
+                if (userRank <= 3) {
+                  winnerFinishes++;
+                }
+              }
             }
           }
         }
+
+        setContestRanks(ranksMap);
+
+        // Update results with ranks
+        const resultsWithRanks = resultsWithContests.map(r => ({
+          ...r,
+          rank: ranksMap[r.contest_id],
+        }));
+        setResults(resultsWithRanks);
 
         setStats({
           totalContests: resultsData.length,
@@ -144,6 +178,8 @@ export default function Profile() {
           accuracy: Math.round(accuracy),
           totalQuestions,
           correctAnswers: totalScore,
+          topFinishes,
+          winnerFinishes,
         });
       }
     } catch (error) {
@@ -162,11 +198,23 @@ export default function Profile() {
     if (!rank) return null;
     if (rank === 1) return { label: '🥇 Champion', color: 'bg-amber-500/20 text-amber-500' };
     if (rank <= 3) return { label: '🏆 Top 3', color: 'bg-primary/20 text-primary' };
-    if (rank <= 10) return { label: '⭐ Top 10', color: 'bg-accent/20 text-accent' };
+    if (rank <= 10) return { label: '⭐ Top 10', color: 'bg-accent/20 text-accent-foreground' };
     return null;
   };
 
+  const getAchievementBadges = () => {
+    const badges = [];
+    if (stats.winnerFinishes > 0) {
+      badges.push({ label: `🏆 ${stats.winnerFinishes}x Winner`, color: 'bg-amber-500/20 text-amber-500 border-amber-500/30' });
+    }
+    if (stats.topFinishes > stats.winnerFinishes) {
+      badges.push({ label: `⭐ ${stats.topFinishes}x Top 10`, color: 'bg-primary/20 text-primary border-primary/30' });
+    }
+    return badges;
+  };
+
   const rankBadge = getRankBadge(stats.bestRank);
+  const achievementBadges = getAchievementBadges();
   const displayProfile = isOwnProfile ? currentUserProfile : viewingProfile;
 
   if (authLoading || loading) {
@@ -214,12 +262,21 @@ export default function Profile() {
               </Avatar>
             )}
             <div className="flex-1">
-              <div className="flex items-center gap-3 mb-2">
+              <div className="flex flex-wrap items-center gap-3 mb-2">
                 <h1 className="text-2xl md:text-3xl font-bold">{displayProfile.username}</h1>
                 {rankBadge && (
                   <Badge className={rankBadge.color}>{rankBadge.label}</Badge>
                 )}
               </div>
+              {achievementBadges.length > 0 && (
+                <div className="flex flex-wrap gap-2 mb-2">
+                  {achievementBadges.map((badge, idx) => (
+                    <Badge key={idx} variant="outline" className={badge.color}>
+                      {badge.label}
+                    </Badge>
+                  ))}
+                </div>
+              )}
               {isOwnProfile && user?.email && (
                 <p className="text-muted-foreground">{user.email}</p>
               )}
@@ -279,6 +336,7 @@ export default function Profile() {
                 const accuracy = result.total_questions 
                   ? Math.round((result.score || 0) / result.total_questions * 100) 
                   : 0;
+                const rank = result.rank;
                 
                 return (
                   <Link
@@ -291,13 +349,19 @@ export default function Profile() {
                         <Trophy className="h-6 w-6 text-primary" />
                       </div>
                       <div>
-                        <p className="font-medium">{result.contest?.name || 'Contest'}</p>
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium">{result.contest?.name || 'Contest'}</p>
+                          {rank && rank <= 10 && <RankBadge rank={rank} size="sm" />}
+                        </div>
                         <div className="flex items-center gap-2 text-sm text-muted-foreground">
                           <span>{result.completed_at && format(new Date(result.completed_at), 'PPP')}</span>
                           {result.contest?.contest_type && (
                             <Badge variant="outline" className="text-xs">
                               {result.contest.contest_type}
                             </Badge>
+                          )}
+                          {rank && (
+                            <span className="text-primary font-medium">Rank #{rank}</span>
                           )}
                         </div>
                       </div>

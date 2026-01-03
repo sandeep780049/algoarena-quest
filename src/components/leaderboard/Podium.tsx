@@ -1,5 +1,6 @@
-import { Trophy, Medal, Clock, Crown } from 'lucide-react';
+import { Trophy, Medal, Clock, Crown, Star } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Badge } from '@/components/ui/badge';
 import { Link } from 'react-router-dom';
 
 interface PodiumEntry {
@@ -44,6 +45,8 @@ function PodiumCard({ entry, position, currentUserId }: {
       glowClass: 'shadow-lg shadow-amber-500/20',
       order: 'order-2',
       label: '1st',
+      badgeLabel: 'Champion',
+      badgeColor: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
     },
     2: {
       size: 'h-32',
@@ -55,6 +58,8 @@ function PodiumCard({ entry, position, currentUserId }: {
       glowClass: 'shadow-lg shadow-slate-400/20',
       order: 'order-1',
       label: '2nd',
+      badgeLabel: 'Runner-up',
+      badgeColor: 'bg-slate-400/20 text-slate-400 border-slate-400/30',
     },
     3: {
       size: 'h-28',
@@ -66,6 +71,8 @@ function PodiumCard({ entry, position, currentUserId }: {
       glowClass: 'shadow-lg shadow-orange-500/20',
       order: 'order-3',
       label: '3rd',
+      badgeLabel: 'Third Place',
+      badgeColor: 'bg-orange-500/20 text-orange-500 border-orange-500/30',
     },
   };
 
@@ -104,6 +111,11 @@ function PodiumCard({ entry, position, currentUserId }: {
         {entry.profile?.username || 'Anonymous'}
         {isCurrentUser && <span className="text-xs ml-1">(You)</span>}
       </Link>
+
+      {/* Badge */}
+      <Badge variant="outline" className={`mt-1 text-xs ${c.badgeColor}`}>
+        {c.badgeLabel}
+      </Badge>
 
       {/* Score */}
       <p className={`text-2xl font-bold ${position === 1 ? 'text-amber-400' : 'text-primary'}`}>

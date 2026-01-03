@@ -6,9 +6,13 @@ import {
   Trophy,
   Instagram,
   MessageCircle,
-  Twitter
+  Twitter,
+  Crown,
+  Medal,
+  Star
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -42,11 +46,11 @@ export function ShareResultCard({
   const { toast } = useToast();
 
   const getRankBadge = (rank: number) => {
-    if (rank === 1) return { text: '🥇 1st Place', color: 'text-amber-400' };
-    if (rank === 2) return { text: '🥈 2nd Place', color: 'text-slate-400' };
-    if (rank === 3) return { text: '🥉 3rd Place', color: 'text-orange-500' };
-    if (rank <= 10) return { text: `Top 10 - #${rank}`, color: 'text-primary' };
-    return { text: `Rank #${rank}`, color: 'text-muted-foreground' };
+    if (rank === 1) return { text: '🥇 Champion', color: 'text-amber-400', icon: Crown };
+    if (rank === 2) return { text: '🥈 Runner-up', color: 'text-slate-400', icon: Medal };
+    if (rank === 3) return { text: '🥉 Third Place', color: 'text-orange-500', icon: Medal };
+    if (rank <= 10) return { text: `⭐ Top 10 - #${rank}`, color: 'text-primary', icon: Star };
+    return { text: `Rank #${rank}`, color: 'text-muted-foreground', icon: null };
   };
 
   const rankBadge = getRankBadge(rank);
@@ -159,7 +163,14 @@ export function ShareResultCard({
             </Avatar>
             <div>
               <p className="font-bold text-lg">{username}</p>
-              <p className={`font-semibold ${rankBadge.color}`}>{rankBadge.text}</p>
+              <div className="flex items-center gap-2">
+                <p className={`font-semibold ${rankBadge.color}`}>{rankBadge.text}</p>
+                {rank <= 10 && (
+                  <Badge variant="outline" className={`${rank <= 3 ? 'bg-amber-500/20 border-amber-500/30' : 'bg-primary/20 border-primary/30'}`}>
+                    {rank <= 3 ? 'Winner' : 'Top 10'}
+                  </Badge>
+                )}
+              </div>
             </div>
           </div>
 

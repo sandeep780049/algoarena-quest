@@ -5,6 +5,8 @@ import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
+import { useAntiCheat } from '@/hooks/useAntiCheat';
+import { EarlySubmitDialog } from '@/components/quiz/EarlySubmitDialog';
 import type { Contest } from '@/lib/supabase';
 import { 
   ChevronLeft, 
@@ -23,6 +25,7 @@ interface QuizQuestion {
   question_text: string;
   code_block: string | null;
   options: string[];
+  option_mapping?: Record<string, string>;
 }
 
 interface QuizResult {
@@ -65,13 +68,16 @@ export default function Quiz() {
   const [startedAt, setStartedAt] = useState<Date | null>(null);
   const [quizResult, setQuizResult] = useState<QuizResult | null>(null);
   const [hasCompleted, setHasCompleted] = useState(false);
+  const [showEarlySubmitDialog, setShowEarlySubmitDialog] = useState(false);
   
   // Prevent double submission
   const isSubmittingRef = useRef(false);
 
+  // Enable anti-cheat protections when contest is active
+  useAntiCheat(!hasCompleted && !quizResult && !loading && questions.length > 0);
+
   useEffect(() => {
     if (!user) {
-      // Store intended destination for redirect after login
       sessionStorage.setItem('redirectAfterAuth', `/quiz/${id}`);
       navigate('/auth');
       return;
@@ -91,7 +97,6 @@ export default function Quiz() {
       const diff = differenceInSeconds(endTime, now);
       
       if (diff <= 0) {
-        // Auto-submit when time runs out
         handleSubmit();
         return;
       }
@@ -106,7 +111,6 @@ export default function Quiz() {
 
   const fetchQuizData = async () => {
     try {
-      // Fetch contest
       const { data: contestData, error: contestError } = await supabase
         .from('contests')
         .select('*')
@@ -122,7 +126,6 @@ export default function Quiz() {
       const contestTyped = contestData as Contest;
       setContest(contestTyped);
 
-      // Check if contest is live
       const startTime = new Date(contestTyped.start_time);
       const endTime = addMinutes(startTime, contestTyped.duration_minutes);
       const now = new Date();
@@ -137,7 +140,6 @@ export default function Quiz() {
         return;
       }
 
-      // Check if user has COMPLETED this contest using secure function
       if (user) {
         const { data: existingResultData } = await supabase.rpc('get_my_contest_result', {
           p_contest_id: id
@@ -146,7 +148,6 @@ export default function Quiz() {
         const existingResult = existingResultData as unknown as MyContestResultResponse | null;
 
         if (existingResult) {
-          // User has already submitted - show their result
           setHasCompleted(true);
           setQuizResult({
             score: existingResult.score || 0,
@@ -161,7 +162,7 @@ export default function Quiz() {
         }
       }
 
-      // SECURITY: Use secure RPC function that never exposes correct_answer
+      // SECURITY: Use secure RPC function with shuffled questions/options
       const { data: questionsData, error: questionsError } = await supabase
         .rpc('get_contest_questions', { p_contest_id: id });
 
@@ -170,12 +171,12 @@ export default function Quiz() {
       }
       
       if (questionsData && Array.isArray(questionsData) && questionsData.length > 0) {
-        // Properly handle the RPC response with Json types
         const formattedQuestions: QuizQuestion[] = questionsData.map((q) => ({
           id: q.id as string,
           question_text: q.question_text as string,
           code_block: q.code_block as string | null,
-          options: (Array.isArray(q.options) ? q.options : []) as string[]
+          options: (Array.isArray(q.options) ? q.options : []) as string[],
+          option_mapping: q.option_mapping as Record<string, string> | undefined,
         }));
         setQuestions(formattedQuestions);
       }
@@ -197,7 +198,6 @@ export default function Quiz() {
         }
       }
 
-      // Set start time
       setStartedAt(new Date());
       
     } catch (error) {
@@ -212,12 +212,10 @@ export default function Quiz() {
     }
   };
 
-  // Save answer using secure server-side function
   const saveAnswer = async (questionId: string, answerIndex: number) => {
     if (!user || !contest) return;
 
     try {
-      // Use secure RPC function - server validates and saves without exposing correct answer
       const { data, error } = await supabase.rpc('save_quiz_answer', {
         p_contest_id: contest.id,
         p_question_id: questionId,
@@ -245,14 +243,12 @@ export default function Quiz() {
   };
 
   const handleSubmit = useCallback(async () => {
-    // Prevent double submission using ref (works across renders)
     if (!user || !contest || isSubmittingRef.current || quizResult || hasCompleted) return;
     
     isSubmittingRef.current = true;
     setSubmitting(true);
 
     try {
-      // Use secure server-side function to submit and calculate score
       const { data: responseData, error } = await supabase.rpc('submit_quiz_answers', {
         p_contest_id: contest.id,
         p_answers: answers,
@@ -268,7 +264,6 @@ export default function Quiz() {
       }
 
       if (data?.already_submitted) {
-        // Already submitted - show existing result
         setQuizResult({
           score: data.score || 0,
           totalQuestions: data.total_questions || 0,
@@ -308,12 +303,22 @@ export default function Quiz() {
         description: 'Failed to submit quiz. Please try again.',
         variant: 'destructive',
       });
-      // Reset the ref so user can try again
       isSubmittingRef.current = false;
     } finally {
       setSubmitting(false);
     }
   }, [user, contest, startedAt, answers, quizResult, hasCompleted, toast]);
+
+  const handleSubmitClick = () => {
+    // Check if there's still time remaining
+    if (timeRemaining > 60) {
+      // More than 1 minute left - show confirmation
+      setShowEarlySubmitDialog(true);
+    } else {
+      // Less than 1 minute or time's up - submit directly
+      handleSubmit();
+    }
+  };
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -332,7 +337,6 @@ export default function Quiz() {
     );
   }
 
-  // Show result screen if already completed
   if (quizResult) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
@@ -418,6 +422,18 @@ export default function Quiz() {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Early Submit Confirmation Dialog */}
+      <EarlySubmitDialog
+        open={showEarlySubmitDialog}
+        onOpenChange={setShowEarlySubmitDialog}
+        onConfirm={() => {
+          setShowEarlySubmitDialog(false);
+          handleSubmit();
+        }}
+        answeredCount={answeredCount}
+        totalQuestions={questions.length}
+      />
+
       {/* Header */}
       <header className="sticky top-0 z-50 border-b border-border bg-background/80 backdrop-blur-xl">
         <div className="container mx-auto px-4">
@@ -526,7 +542,7 @@ export default function Quiz() {
             <div className="flex gap-2">
               {currentIndex === questions.length - 1 && (
                 <Button 
-                  onClick={handleSubmit}
+                  onClick={handleSubmitClick}
                   disabled={submitting}
                   className="bg-primary"
                 >
