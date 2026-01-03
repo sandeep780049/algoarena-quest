@@ -17,6 +17,7 @@ import PrivacyPolicy from "./pages/PrivacyPolicy";
 import Terms from "./pages/Terms";
 import About from "./pages/About";
 import Contact from "./pages/Contact";
+import Certificate from "./pages/Certificate";
 
 const queryClient = new QueryClient();
 
@@ -35,11 +36,13 @@ const App = () => (
             <Route path="/quiz/:id" element={<Quiz />} />
             <Route path="/leaderboard" element={<Leaderboard />} />
             <Route path="/profile" element={<Profile />} />
+            <Route path="/profile/:userId" element={<Profile />} />
             <Route path="/admin" element={<Admin />} />
             <Route path="/privacy" element={<PrivacyPolicy />} />
             <Route path="/terms" element={<Terms />} />
             <Route path="/about" element={<About />} />
             <Route path="/contact" element={<Contact />} />
+            <Route path="/certificate/:code" element={<Certificate />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

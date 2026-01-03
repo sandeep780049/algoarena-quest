@@ -194,3 +194,32 @@
   0%, 100% { opacity: 1; }
   50% { opacity: 0.5; }
 }
+
+/* Anti-cheat protections for live contests */
+.anti-cheat-active {
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  -moz-user-select: none !important;
+  -ms-user-select: none !important;
+}
+
+.anti-cheat-active * {
+  user-select: none !important;
+  -webkit-user-select: none !important;
+}
+
+.anti-cheat-active img {
+  pointer-events: none;
+  -webkit-user-drag: none;
+}
+
+.anti-cheat-active pre,
+.anti-cheat-active code {
+  user-select: none !important;
+  -webkit-user-select: none !important;
+}
+
+/* Prevent long-press on mobile */
+.anti-cheat-active {
+  -webkit-touch-callout: none;
+}

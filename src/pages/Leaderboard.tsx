@@ -7,18 +7,20 @@ import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
-import type { Contest, ContestResult, Profile } from '@/lib/supabase';
+import { useToast } from '@/hooks/use-toast';
+import type { Contest, Profile } from '@/lib/supabase';
 import { Podium } from '@/components/leaderboard/Podium';
+import { RankBadge } from '@/components/leaderboard/RankBadge';
 import { ShareResultCard } from '@/components/share/ShareResultCard';
 import { ShareTop3Card } from '@/components/share/ShareTop3Card';
+import { CertificateCard } from '@/components/certificate/CertificateCard';
 import { 
   Trophy, 
   Clock, 
-  User, 
   Lock,
   Share2,
-  AlertCircle,
-  Award
+  Award,
+  FileText
 } from 'lucide-react';
 import { addMinutes } from 'date-fns';
 import {
@@ -57,6 +59,15 @@ interface GlobalLeaderboardRpcEntry {
   contest_count: number;
 }
 
+interface CertificateData {
+  certificate_code: string;
+  rank: number;
+  username: string;
+  contest_name: string;
+  contest_date: string;
+  issued_at: string;
+}
+
 function getContestStatus(contest: Contest): 'upcoming' | 'live' | 'ended' {
   const startTime = new Date(contest.start_time);
   const endTime = addMinutes(startTime, contest.duration_minutes);
@@ -69,6 +80,7 @@ function getContestStatus(contest: Contest): 'upcoming' | 'live' | 'ended' {
 
 export default function Leaderboard() {
   const { user, profile: currentUserProfile, isAdmin } = useAuth();
+  const { toast } = useToast();
   const [searchParams] = useSearchParams();
   const contestId = searchParams.get('contest');
   
@@ -78,6 +90,7 @@ export default function Leaderboard() {
   const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [isContestLocked, setIsContestLocked] = useState(false);
+  const [certificates, setCertificates] = useState<Record<string, CertificateData>>({});
 
   useEffect(() => {
     fetchContests();
@@ -114,7 +127,6 @@ export default function Leaderboard() {
   const fetchLeaderboard = async (contestId: string) => {
     setLoading(true);
     try {
-      // Use secure RPC function to get leaderboard data
       const { data: rpcData, error } = await supabase.rpc('get_leaderboard_entries', {
         p_contest_id: contestId
       });
@@ -139,8 +151,30 @@ export default function Leaderboard() {
           } as Profile,
         }));
         setEntries(entries);
+
+        // Fetch certificates for top 10
+        const { data: certsData } = await supabase
+          .from('certificates')
+          .select('*')
+          .eq('contest_id', contestId);
+        
+        if (certsData) {
+          const certsMap: Record<string, CertificateData> = {};
+          certsData.forEach((cert: any) => {
+            certsMap[cert.user_id] = {
+              certificate_code: cert.certificate_code,
+              rank: cert.rank,
+              username: cert.username,
+              contest_name: cert.contest_name,
+              contest_date: cert.contest_date,
+              issued_at: cert.issued_at,
+            };
+          });
+          setCertificates(certsMap);
+        }
       } else {
         setEntries([]);
+        setCertificates({});
       }
     } catch (error) {
       console.error('Error fetching leaderboard:', error);
@@ -152,7 +186,6 @@ export default function Leaderboard() {
   const fetchGlobalLeaderboard = async () => {
     setLoading(true);
     try {
-      // Use secure RPC function to get global leaderboard
       const { data: rpcData, error } = await supabase.rpc('get_global_leaderboard');
 
       if (error) throw error;
@@ -178,10 +211,50 @@ export default function Leaderboard() {
       } else {
         setEntries([]);
       }
+      setCertificates({});
     } catch (error) {
       console.error('Error fetching global leaderboard:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleGenerateCertificate = async (userId: string) => {
+    if (!selectedContest) return;
+
+    try {
+      const { data, error } = await supabase.rpc('generate_certificate', {
+        p_contest_id: selectedContest,
+        p_user_id: userId,
+      });
+
+      if (error) throw error;
+
+      const result = data as { success?: boolean; error?: string; certificate_code?: string };
+      
+      if (result.error) {
+        toast({
+          title: 'Error',
+          description: result.error,
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      toast({
+        title: 'Certificate Generated!',
+        description: `Certificate code: ${result.certificate_code}`,
+      });
+
+      // Refresh leaderboard to get certificate data
+      fetchLeaderboard(selectedContest);
+    } catch (error) {
+      console.error('Error generating certificate:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to generate certificate',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -204,7 +277,6 @@ export default function Leaderboard() {
   const top3Entries = entries.slice(0, 3);
   const restEntries = entries.filter(e => e.rank > 3);
 
-  // Helper function to render share button for any entry
   const renderShareButton = (entry: LeaderboardEntry, entryProfile: Profile | null) => {
     if (!selectedContestData) return null;
     
@@ -231,6 +303,61 @@ export default function Leaderboard() {
           />
         </DialogContent>
       </Dialog>
+    );
+  };
+
+  const renderCertificateButton = (entry: LeaderboardEntry) => {
+    if (!selectedContestData || entry.rank > 10) return null;
+    
+    const isCurrentUser = entry.user_id === user?.id;
+    const canView = isCurrentUser || isAdmin;
+    
+    if (!canView) return null;
+
+    const cert = certificates[entry.user_id];
+    
+    if (cert) {
+      return (
+        <Dialog>
+          <DialogTrigger asChild>
+            <Button size="sm" variant="outline" className="gap-1">
+              <FileText className="h-4 w-4" />
+              Certificate
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Certificate of Achievement</DialogTitle>
+            </DialogHeader>
+            <CertificateCard
+              username={cert.username}
+              contestName={cert.contest_name}
+              contestDate={cert.contest_date}
+              rank={cert.rank}
+              certificateCode={cert.certificate_code}
+              issuedAt={cert.issued_at}
+            />
+          </DialogContent>
+        </Dialog>
+      );
+    }
+
+    // Show generate button for admin or the user themselves
+    const contest = selectedContestData;
+    const status = getContestStatus(contest);
+    
+    if (status !== 'ended') return null;
+
+    return (
+      <Button 
+        size="sm" 
+        variant="outline" 
+        className="gap-1"
+        onClick={() => handleGenerateCertificate(entry.user_id)}
+      >
+        <FileText className="h-4 w-4" />
+        Get Certificate
+      </Button>
     );
   };
 
@@ -311,7 +438,7 @@ export default function Leaderboard() {
             {/* Podium for Top 3 */}
             <Podium entries={entries} currentUserId={user?.id} />
 
-            {/* Share Top 3 Button - visible to everyone when contest is selected */}
+            {/* Share Top 3 Button */}
             {selectedContestData && top3Entries.length >= 3 && (
               <div className="flex justify-center">
                 <Dialog>
@@ -340,7 +467,7 @@ export default function Leaderboard() {
               </div>
             )}
 
-            {/* Top 3 Share Buttons (for admin or for the user's own entry) */}
+            {/* Top 3 Share/Certificate Buttons */}
             {selectedContestData && top3Entries.length > 0 && (
               <div className="flex flex-wrap justify-center gap-4 mb-4">
                 {top3Entries.map((entry) => {
@@ -358,18 +485,20 @@ export default function Leaderboard() {
                         {entry.profile?.username || 'Anonymous'}
                         {isCurrentUser && ' (You)'}
                       </span>
+                      <RankBadge rank={entry.rank} />
                       {renderShareButton(entry, entry.profile)}
+                      {renderCertificateButton(entry)}
                     </div>
                   );
                 })}
               </div>
             )}
 
-            {/* "— You —" Row - Shows for current user regardless of rank */}
+            {/* "— You —" Row */}
             {currentUserEntry && (
               <div className="p-4 rounded-xl bg-primary/10 border border-primary/30">
                 <div className="text-center text-sm text-muted-foreground mb-3">— You —</div>
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between flex-wrap gap-4">
                   <div className="flex items-center gap-4">
                     <Badge className={getRankBadgeStyle(currentUserEntry.rank)}>
                       #{currentUserEntry.rank}
@@ -381,16 +510,22 @@ export default function Leaderboard() {
                       </AvatarFallback>
                     </Avatar>
                     <div>
-                      <p className="font-semibold">{currentUserEntry.profile?.username} (You)</p>
+                      <div className="flex items-center gap-2">
+                        <p className="font-semibold">{currentUserEntry.profile?.username} (You)</p>
+                        <RankBadge rank={currentUserEntry.rank} />
+                      </div>
                       <p className="text-sm text-muted-foreground">Your ranking</p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-6">
+                  <div className="flex items-center gap-4">
                     <div className="text-right">
                       <p className="text-2xl font-bold text-primary">{currentUserEntry.score}</p>
                       <p className="text-sm text-muted-foreground">points</p>
                     </div>
-                    {renderShareButton(currentUserEntry, currentUserProfile)}
+                    <div className="flex gap-2">
+                      {renderShareButton(currentUserEntry, currentUserProfile)}
+                      {renderCertificateButton(currentUserEntry)}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -440,9 +575,10 @@ export default function Leaderboard() {
                               {entry.profile?.username?.charAt(0).toUpperCase() || '?'}
                             </AvatarFallback>
                           </Avatar>
-                          <span className="font-medium truncate">
+                          <span className="font-medium truncate flex items-center gap-2">
                             {entry.profile?.username || 'Anonymous'}
-                            {isCurrentUser && <span className="text-primary ml-1">(You)</span>}
+                            {isCurrentUser && <span className="text-primary">(You)</span>}
+                            <RankBadge rank={entry.rank} size="sm" />
                           </span>
                         </Link>
                       </div>
@@ -456,8 +592,9 @@ export default function Leaderboard() {
                         <Clock className="h-4 w-4 inline mr-1" />
                         {formatTime(entry.time_taken_seconds as number)}
                       </div>
-                      <div className="col-span-12 md:col-span-2 flex justify-center">
+                      <div className="col-span-12 md:col-span-2 flex justify-center gap-2">
                         {canShare && selectedContestData && renderShareButton(entry, entry.profile)}
+                        {renderCertificateButton(entry)}
                       </div>
                     </div>
                   );

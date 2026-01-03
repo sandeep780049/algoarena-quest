@@ -14,6 +14,50 @@ export type Database = {
   }
   public: {
     Tables: {
+      certificates: {
+        Row: {
+          certificate_code: string
+          contest_date: string
+          contest_id: string
+          contest_name: string
+          id: string
+          issued_at: string
+          rank: number
+          user_id: string
+          username: string
+        }
+        Insert: {
+          certificate_code: string
+          contest_date: string
+          contest_id: string
+          contest_name: string
+          id?: string
+          issued_at?: string
+          rank: number
+          user_id: string
+          username: string
+        }
+        Update: {
+          certificate_code?: string
+          contest_date?: string
+          contest_id?: string
+          contest_name?: string
+          id?: string
+          issued_at?: string
+          rank?: number
+          user_id?: string
+          username?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "certificates_contest_id_fkey"
+            columns: ["contest_id"]
+            isOneToOne: false
+            referencedRelation: "contests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       contest_questions: {
         Row: {
           contest_id: string
@@ -303,17 +347,55 @@ export type Database = {
         }
         Relationships: []
       }
+      user_shuffle_seeds: {
+        Row: {
+          contest_id: string
+          created_at: string
+          id: string
+          seed: number
+          user_id: string
+        }
+        Insert: {
+          contest_id: string
+          created_at?: string
+          id?: string
+          seed: number
+          user_id: string
+        }
+        Update: {
+          contest_id?: string
+          created_at?: string
+          id?: string
+          seed?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_shuffle_seeds_contest_id_fkey"
+            columns: ["contest_id"]
+            isOneToOne: false
+            referencedRelation: "contests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
+      generate_certificate: {
+        Args: { p_contest_id: string; p_user_id: string }
+        Returns: Json
+      }
+      get_certificate_by_code: { Args: { p_code: string }; Returns: Json }
       get_contest_questions: {
         Args: { p_contest_id: string }
         Returns: {
           code_block: string
           difficulty: string
           id: string
+          option_mapping: Json
           options: Json
           question_text: string
           tags: string[]
