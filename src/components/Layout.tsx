@@ -1,4 +1,4 @@
-import { ReactNode } from 'react';
+import { ReactNode, useEffect, useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
@@ -13,7 +13,6 @@ import {
   Home,
   Code2
 } from 'lucide-react';
-import { useState } from 'react';
 
 interface LayoutProps {
   children: ReactNode;
@@ -24,6 +23,25 @@ export function Layout({ children }: LayoutProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [visitedLinks, setVisitedLinks] = useState<Set<string>>(new Set());
+
+  // Load visited links from localStorage on mount
+  useEffect(() => {
+    const stored = localStorage.getItem('visitedLinks');
+    if (stored) {
+      setVisitedLinks(new Set(JSON.parse(stored)));
+    }
+  }, []);
+
+  // Mark current path as visited
+  useEffect(() => {
+    setVisitedLinks(prev => {
+      const newSet = new Set(prev);
+      newSet.add(location.pathname);
+      localStorage.setItem('visitedLinks', JSON.stringify([...newSet]));
+      return newSet;
+    });
+  }, [location.pathname]);
 
   const handleSignOut = async () => {
     await signOut();
@@ -37,6 +55,7 @@ export function Layout({ children }: LayoutProps) {
   ];
 
   const isActive = (path: string) => location.pathname === path;
+  const isVisited = (path: string) => visitedLinks.has(path) && !isActive(path);
 
   return (
     <div className="min-h-screen bg-background bg-grid">
@@ -65,6 +84,8 @@ export function Layout({ children }: LayoutProps) {
                   className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                     isActive(item.href)
                       ? 'bg-primary/10 text-primary'
+                      : isVisited(item.href)
+                      ? 'text-pink-400 hover:text-pink-300 hover:bg-secondary'
                       : 'text-muted-foreground hover:text-foreground hover:bg-secondary'
                   }`}
                 >
@@ -134,6 +155,8 @@ export function Layout({ children }: LayoutProps) {
                   className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
                     isActive(item.href)
                       ? 'bg-primary/10 text-primary'
+                      : isVisited(item.href)
+                      ? 'text-pink-400 hover:text-pink-300 hover:bg-secondary'
                       : 'text-muted-foreground hover:text-foreground hover:bg-secondary'
                   }`}
                 >
