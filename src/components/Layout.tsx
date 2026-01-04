@@ -236,8 +236,8 @@ export function Layout({ children }: LayoutProps) {
                   </a>
                 </span>
               </div>
-              <p className="text-sm text-muted-foreground">
-                © 2024 JC AlgoArena. Level up your coding skills.
+            <p className="text-sm text-muted-foreground">
+                © 2026 JC AlgoArena. All rights reserved.
               </p>
             </div>
           </div>
