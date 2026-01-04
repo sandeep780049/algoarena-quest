@@ -27,7 +27,7 @@
     <!-- Favicon -->
     <link rel="icon" type="image/jpeg" href="https://storage.googleapis.com/gpt-engineer-file-uploads/6KqQuPTsG5UR3rnYRHZxmwbxZsa2/uploads/1767403174325-im.jpg">
     
-    <!-- Schema.org structured data for Google -->
+    <!-- Schema.org structured data for Google sitelinks -->
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",
@@ -36,6 +36,11 @@
       "alternateName": "JC AlgoArena Coding Platform",
       "url": "https://algoarena-quest.lovable.app",
       "description": "A free platform for coding contests, quizzes, and programming practice.",
+      "potentialAction": {
+        "@type": "SearchAction",
+        "target": "https://algoarena-quest.lovable.app/contests?q={search_term_string}",
+        "query-input": "required name=search_term_string"
+      },
       "publisher": {
         "@type": "Organization",
         "name": "JC AlgoArena",
