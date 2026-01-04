@@ -451,6 +451,65 @@ export default function Index() {
           </div>
         </div>
       </section>
+
+      {/* Quick Links Section for SEO */}
+      <section className="py-12 border-t border-border">
+        <div className="container mx-auto px-4">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            <a 
+              href="/contests" 
+              className="group flex items-center gap-3 p-4 rounded-xl bg-card border border-border hover:border-primary/50 transition-all"
+            >
+              <Trophy className="h-6 w-6 text-primary group-hover:scale-110 transition-transform" />
+              <div>
+                <h3 className="font-semibold">View All Contests</h3>
+                <p className="text-sm text-muted-foreground">Browse available challenges</p>
+              </div>
+              <ChevronRight className="h-5 w-5 ml-auto text-muted-foreground group-hover:text-primary transition-colors" />
+            </a>
+            
+            <a 
+              href="/leaderboard" 
+              className="group flex items-center gap-3 p-4 rounded-xl bg-card border border-border hover:border-primary/50 transition-all"
+            >
+              <Code2 className="h-6 w-6 text-primary group-hover:scale-110 transition-transform" />
+              <div>
+                <h3 className="font-semibold">Global Leaderboard</h3>
+                <p className="text-sm text-muted-foreground">See top performers</p>
+              </div>
+              <ChevronRight className="h-5 w-5 ml-auto text-muted-foreground group-hover:text-primary transition-colors" />
+            </a>
+            
+            {!user && (
+              <>
+                <a 
+                  href="/auth?mode=signup" 
+                  className="group flex items-center gap-3 p-4 rounded-xl bg-card border border-border hover:border-primary/50 transition-all"
+                >
+                  <Users className="h-6 w-6 text-primary group-hover:scale-110 transition-transform" />
+                  <div>
+                    <h3 className="font-semibold">Create Free Account</h3>
+                    <p className="text-sm text-muted-foreground">Join our community</p>
+                  </div>
+                  <ChevronRight className="h-5 w-5 ml-auto text-muted-foreground group-hover:text-primary transition-colors" />
+                </a>
+                
+                <a 
+                  href="/auth" 
+                  className="group flex items-center gap-3 p-4 rounded-xl bg-card border border-border hover:border-primary/50 transition-all"
+                >
+                  <Zap className="h-6 w-6 text-primary group-hover:scale-110 transition-transform" />
+                  <div>
+                    <h3 className="font-semibold">Sign In</h3>
+                    <p className="text-sm text-muted-foreground">Access your account</p>
+                  </div>
+                  <ChevronRight className="h-5 w-5 ml-auto text-muted-foreground group-hover:text-primary transition-colors" />
+                </a>
+              </>
+            )}
+          </div>
+        </div>
+      </section>
     </Layout>
   );
 }
