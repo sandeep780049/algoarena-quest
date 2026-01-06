@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Layout } from '@/components/Layout';
 import { SEO } from '@/components/SEO';
 import { Button } from '@/components/ui/button';
@@ -100,6 +100,7 @@ function ContestCard({ contest }: { contest: ContestWithCount }) {
 
 export default function Index() {
   const { user, isAdmin } = useAuth();
+  const navigate = useNavigate();
   const [liveContests, setLiveContests] = useState<ContestWithCount[]>([]);
   const [upcomingContests, setUpcomingContests] = useState<ContestWithCount[]>([]);
   const [dailyContests, setDailyContests] = useState<ContestWithCount[]>([]);
@@ -222,8 +223,8 @@ export default function Index() {
       />
       {/* Hero Section */}
       <section className="relative overflow-hidden">
-        <div className="absolute inset-0 bg-hero-gradient opacity-50" />
-        <div className="absolute inset-0 bg-dots opacity-30" />
+        <div className="pointer-events-none absolute inset-0 bg-hero-gradient opacity-50" />
+        <div className="pointer-events-none absolute inset-0 bg-dots opacity-30" />
         
         <div className="container mx-auto px-4 py-16 md:py-24 relative">
           <div className="max-w-4xl mx-auto text-center space-y-6">
@@ -244,26 +245,33 @@ export default function Index() {
 
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
               {user ? (
-                <Link to="/contests">
-                  <Button variant="hero" size="xl">
-                    <Trophy className="h-5 w-5 mr-2" />
-                    Browse Contests
-                    <ChevronRight className="h-5 w-5 ml-1" />
-                  </Button>
-                </Link>
+                <Button
+                  variant="hero"
+                  size="xl"
+                  onClick={() => navigate('/contests')}
+                >
+                  <Trophy className="h-5 w-5 mr-2" />
+                  Browse Contests
+                  <ChevronRight className="h-5 w-5 ml-1" />
+                </Button>
               ) : (
                 <>
-                  <Link to="/auth?mode=signup">
-                    <Button variant="hero" size="xl">
-                      Get Started Free
-                      <ChevronRight className="h-5 w-5 ml-1" />
-                    </Button>
-                  </Link>
-                  <Link to="/contests">
-                    <Button variant="outline" size="xl">
-                      View Contests
-                    </Button>
-                  </Link>
+                  <Button
+                    variant="hero"
+                    size="xl"
+                    onClick={() => navigate('/auth/signup')}
+                  >
+                    Get Started Free
+                    <ChevronRight className="h-5 w-5 ml-1" />
+                  </Button>
+
+                  <Button
+                    variant="outline"
+                    size="xl"
+                    onClick={() => navigate('/contests')}
+                  >
+                    View Contests
+                  </Button>
                 </>
               )}
             </div>
@@ -287,8 +295,8 @@ export default function Index() {
           </div>
         </div>
 
-        <div className="absolute top-20 left-10 w-72 h-72 bg-primary/10 rounded-full blur-3xl animate-float" />
-        <div className="absolute bottom-20 right-10 w-96 h-96 bg-accent/10 rounded-full blur-3xl animate-float" style={{ animationDelay: '-3s' }} />
+        <div className="pointer-events-none absolute top-20 left-10 w-72 h-72 bg-primary/10 rounded-full blur-3xl animate-float" />
+        <div className="pointer-events-none absolute bottom-20 right-10 w-96 h-96 bg-accent/10 rounded-full blur-3xl animate-float" style={{ animationDelay: '-3s' }} />
       </section>
 
       {/* Live Contests */}
@@ -441,12 +449,12 @@ export default function Index() {
               <p className="text-muted-foreground mb-8">
                 Join thousands of coders who are improving their skills daily.
               </p>
-              <Link to={user ? "/contests" : "/auth?mode=signup"}>
-                <Button variant="hero" size="xl">
+              <Button asChild variant="hero" size="xl">
+                <Link to={user ? "/contests" : "/auth/signup"}>
                   <Terminal className="h-5 w-5 mr-2" />
                   {user ? 'Join a Contest' : 'Start Competing'}
-                </Button>
-              </Link>
+                </Link>
+              </Button>
             </div>
           </div>
         </div>

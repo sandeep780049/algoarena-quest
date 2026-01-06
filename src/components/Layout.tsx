@@ -100,31 +100,31 @@ export function Layout({ children }: LayoutProps) {
               {user ? (
                 <>
                   {isAdmin && (
-                    <Link to="/admin">
-                      <Button variant="outline" size="sm">
+                    <Button asChild variant="outline" size="sm">
+                      <Link to="/admin">
                         <Settings className="h-4 w-4 mr-2" />
                         Admin
-                      </Button>
-                    </Link>
+                      </Link>
+                    </Button>
                   )}
-                  <Link to="/profile">
-                    <Button variant="ghost" size="sm">
+                  <Button asChild variant="ghost" size="sm">
+                    <Link to="/profile">
                       <User className="h-4 w-4 mr-2" />
                       {profile?.username || 'Profile'}
-                    </Button>
-                  </Link>
+                    </Link>
+                  </Button>
                   <Button variant="ghost" size="sm" onClick={handleSignOut}>
                     <LogOut className="h-4 w-4" />
                   </Button>
                 </>
               ) : (
                 <>
-                  <Link to="/auth">
-                    <Button variant="ghost" size="sm">Sign In</Button>
-                  </Link>
-                  <Link to="/auth?mode=signup">
-                    <Button variant="default" size="sm">Get Started</Button>
-                  </Link>
+                  <Button asChild variant="ghost" size="sm">
+                    <Link to="/auth">Sign In</Link>
+                  </Button>
+                  <Button asChild variant="default" size="sm">
+                    <Link to="/auth/signup">Get Started</Link>
+                  </Button>
                 </>
               )}
             </div>
@@ -207,7 +207,7 @@ export function Layout({ children }: LayoutProps) {
                       Sign In
                     </Link>
                     <Link
-                      to="/auth?mode=signup"
+                      to="/auth/signup"
                       onClick={() => setMobileMenuOpen(false)}
                       className="flex items-center justify-center px-4 py-3 rounded-lg text-sm font-medium bg-primary text-primary-foreground"
                     >
