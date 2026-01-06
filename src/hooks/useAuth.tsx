@@ -70,6 +70,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     );
 
     supabase.auth.getSession().then(({ data: { session } }) => {
+      // Check if user opted out of "Remember me" - sign out if session-only flag exists
+      const sessionOnly = sessionStorage.getItem('sessionOnly');
+      const rememberMe = localStorage.getItem('rememberMe');
+      
+      if (session && sessionOnly && !rememberMe) {
+        // User didn't want to be remembered and this is a new browser session
+        sessionStorage.removeItem('sessionOnly');
+        supabase.auth.signOut();
+        setLoading(false);
+        return;
+      }
+      
       setSession(session);
       setUser(session?.user ?? null);
       
@@ -107,6 +119,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signOut = async () => {
+    localStorage.removeItem('rememberMe');
+    sessionStorage.removeItem('sessionOnly');
     await supabase.auth.signOut();
     setUser(null);
     setSession(null);
