@@ -27,14 +27,15 @@ const App = () => (
       <AuthProvider>
         <Toaster />
         <Sonner />
-        <BrowserRouter>
-          <Routes>
-            <Route path="/" element={<Index />} />
-            <Route path="/auth" element={<Auth />} />
-            <Route path="/contests" element={<Contests />} />
-            <Route path="/contest/:id" element={<ContestDetail />} />
-            <Route path="/quiz/:id" element={<Quiz />} />
-            <Route path="/leaderboard" element={<Leaderboard />} />
+          <BrowserRouter>
+            <Routes>
+              <Route path="/" element={<Index />} />
+              <Route path="/auth" element={<Auth />} />
+              <Route path="/auth/signup" element={<Auth />} />
+              <Route path="/auth/reset" element={<Auth />} />
+              <Route path="/contests" element={<Contests />} />
+              <Route path="/contest/:id" element={<ContestDetail />} />
+              <Route path="/quiz/:id" element={<Quiz />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/profile/:userId" element={<Profile />} />
             <Route path="/admin" element={<Admin />} />

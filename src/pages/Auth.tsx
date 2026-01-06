@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams, Link } from 'react-router-dom';
+import { useNavigate, useSearchParams, Link, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -26,8 +26,13 @@ const signUpSchema = signInSchema.extend({
 type AuthView = 'signin' | 'signup' | 'forgot-password';
 
 export default function Auth() {
+  const location = useLocation();
   const [searchParams] = useSearchParams();
-  const [view, setView] = useState<AuthView>(searchParams.get('mode') === 'signup' ? 'signup' : 'signin');
+
+  const initialModeFromPath = location.pathname === '/auth/signup' ? 'signup' : location.pathname === '/auth/reset' ? 'reset' : null;
+  const initialMode = initialModeFromPath ?? searchParams.get('mode');
+
+  const [view, setView] = useState<AuthView>(initialMode === 'signup' ? 'signup' : initialMode === 'reset' ? 'forgot-password' : 'signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -107,7 +112,7 @@ export default function Auth() {
     setLoading(true);
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/auth?mode=reset`,
+        redirectTo: `${window.location.origin}/auth/reset`,
       });
 
       if (error) {
