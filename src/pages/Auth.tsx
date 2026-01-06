@@ -5,10 +5,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Terminal, Eye, EyeOff, ArrowLeft, Phone, Mail } from 'lucide-react';
+import { Terminal, Eye, EyeOff, ArrowLeft } from 'lucide-react';
 import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
-import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp';
 
 const signInSchema = z.object({
   email: z.string().email('Please enter a valid email'),
@@ -23,9 +22,7 @@ const signUpSchema = signInSchema.extend({
   path: ["confirmPassword"],
 });
 
-const phoneSchema = z.string().regex(/^\+[1-9]\d{6,14}$/, 'Please enter a valid phone number with country code (e.g., +1234567890)');
-
-type AuthView = 'signin' | 'signup' | 'forgot-password' | 'phone-login' | 'phone-verify';
+type AuthView = 'signin' | 'signup' | 'forgot-password';
 
 export default function Auth() {
   const [searchParams] = useSearchParams();
@@ -34,8 +31,6 @@ export default function Auth() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [username, setUsername] = useState('');
-  const [phone, setPhone] = useState('');
-  const [otp, setOtp] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -92,7 +87,6 @@ export default function Auth() {
     return !!data;
   };
 
-
   const handlePasswordReset = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -126,75 +120,6 @@ export default function Auth() {
           description: 'We sent you a password reset link. Please check your inbox.',
         });
         setView('signin');
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handlePhoneSignIn = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setErrors({});
-
-    try {
-      phoneSchema.parse(phone);
-    } catch {
-      setErrors({ phone: 'Please enter a valid phone number with country code (e.g., +1234567890)' });
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const { error } = await supabase.auth.signInWithOtp({
-        phone,
-      });
-
-      if (error) {
-        toast({
-          title: 'Failed to send OTP',
-          description: error.message,
-          variant: 'destructive',
-        });
-      } else {
-        toast({
-          title: 'OTP sent',
-          description: 'Please check your phone for the verification code.',
-        });
-        setView('phone-verify');
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleVerifyOtp = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (otp.length !== 6) {
-      setErrors({ otp: 'Please enter the 6-digit code' });
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const { error } = await supabase.auth.verifyOtp({
-        phone,
-        token: otp,
-        type: 'sms',
-      });
-
-      if (error) {
-        toast({
-          title: 'Verification failed',
-          description: error.message,
-          variant: 'destructive',
-        });
-      } else {
-        toast({
-          title: 'Welcome!',
-          description: 'You have signed in successfully.',
-        });
-        navigate('/');
       }
     } finally {
       setLoading(false);
@@ -313,125 +238,6 @@ export default function Auth() {
     </>
   );
 
-  const renderPhoneLogin = () => (
-    <>
-      <div className="text-center mb-8">
-        <div className="inline-flex items-center gap-2 mb-4">
-          <Terminal className="h-8 w-8 text-primary" />
-          <span className="font-bold text-xl">
-            <span className="text-primary">JC</span> AlgoArena
-          </span>
-        </div>
-        <h1 className="text-2xl font-bold">Sign in with phone</h1>
-        <p className="text-muted-foreground mt-2">
-          We'll send you a verification code
-        </p>
-      </div>
-
-      <form onSubmit={handlePhoneSignIn} className="space-y-4">
-        <div className="space-y-2">
-          <Label htmlFor="phone">Phone Number</Label>
-          <Input
-            id="phone"
-            type="tel"
-            placeholder="+1234567890"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            className={errors.phone ? 'border-destructive' : ''}
-          />
-          {errors.phone && (
-            <p className="text-sm text-destructive">{errors.phone}</p>
-          )}
-          <p className="text-xs text-muted-foreground">
-            Include country code (e.g., +1 for US)
-          </p>
-        </div>
-
-        <Button type="submit" className="w-full" disabled={loading}>
-          {loading ? 'Sending...' : 'Send Verification Code'}
-        </Button>
-      </form>
-
-      <div className="mt-6 text-center">
-        <button
-          type="button"
-          onClick={() => setView('signin')}
-          className="text-primary hover:underline font-medium text-sm"
-        >
-          Back to sign in
-        </button>
-      </div>
-    </>
-  );
-
-  const renderPhoneVerify = () => (
-    <>
-      <div className="text-center mb-8">
-        <div className="inline-flex items-center gap-2 mb-4">
-          <Terminal className="h-8 w-8 text-primary" />
-          <span className="font-bold text-xl">
-            <span className="text-primary">JC</span> AlgoArena
-          </span>
-        </div>
-        <h1 className="text-2xl font-bold">Enter verification code</h1>
-        <p className="text-muted-foreground mt-2">
-          We sent a code to {phone}
-        </p>
-      </div>
-
-      <form onSubmit={handleVerifyOtp} className="space-y-6">
-        <div className="flex flex-col items-center space-y-2">
-          <Label htmlFor="otp">Verification Code</Label>
-          <InputOTP
-            maxLength={6}
-            value={otp}
-            onChange={(value) => setOtp(value)}
-          >
-            <InputOTPGroup>
-              <InputOTPSlot index={0} />
-              <InputOTPSlot index={1} />
-              <InputOTPSlot index={2} />
-              <InputOTPSlot index={3} />
-              <InputOTPSlot index={4} />
-              <InputOTPSlot index={5} />
-            </InputOTPGroup>
-          </InputOTP>
-          {errors.otp && (
-            <p className="text-sm text-destructive">{errors.otp}</p>
-          )}
-        </div>
-
-        <Button type="submit" className="w-full" disabled={loading}>
-          {loading ? 'Verifying...' : 'Verify & Sign In'}
-        </Button>
-      </form>
-
-      <div className="mt-6 text-center space-y-2">
-        <button
-          type="button"
-          onClick={() => {
-            setOtp('');
-            handlePhoneSignIn({ preventDefault: () => {} } as React.FormEvent);
-          }}
-          className="text-primary hover:underline font-medium text-sm block w-full"
-          disabled={loading}
-        >
-          Resend code
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            setOtp('');
-            setView('phone-login');
-          }}
-          className="text-muted-foreground hover:text-foreground font-medium text-sm"
-        >
-          Use different phone number
-        </button>
-      </div>
-    </>
-  );
-
   const renderMainAuth = () => (
     <>
       <div className="text-center mb-8">
@@ -541,30 +347,6 @@ export default function Auth() {
         </Button>
       </form>
 
-      {/* Divider */}
-      <div className="relative my-6">
-        <div className="absolute inset-0 flex items-center">
-          <span className="w-full border-t border-border" />
-        </div>
-        <div className="relative flex justify-center text-xs uppercase">
-          <span className="bg-card px-2 text-muted-foreground">Or continue with</span>
-        </div>
-      </div>
-
-      {/* Alternative Sign In */}
-      <div className="space-y-3">
-        <Button
-          type="button"
-          variant="outline"
-          className="w-full"
-          onClick={() => setView('phone-login')}
-          disabled={loading}
-        >
-          <Phone className="mr-2 h-4 w-4" />
-          Continue with Phone
-        </Button>
-      </div>
-
       {/* Toggle */}
       <div className="mt-6 text-center">
         <p className="text-sm text-muted-foreground">
@@ -596,8 +378,6 @@ export default function Auth() {
 
         <div className="bg-card border border-border rounded-2xl p-8 shadow-xl">
           {view === 'forgot-password' && renderForgotPassword()}
-          {view === 'phone-login' && renderPhoneLogin()}
-          {view === 'phone-verify' && renderPhoneVerify()}
           {(view === 'signin' || view === 'signup') && renderMainAuth()}
         </div>
       </div>
