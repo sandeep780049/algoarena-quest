@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Terminal, Eye, EyeOff, ArrowLeft } from 'lucide-react';
 import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
@@ -32,6 +33,7 @@ export default function Auth() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [username, setUsername] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(true);
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   
@@ -178,6 +180,13 @@ export default function Auth() {
             variant: 'destructive',
           });
         } else {
+          // Store remember me preference
+          if (rememberMe) {
+            localStorage.setItem('rememberMe', 'true');
+          } else {
+            localStorage.removeItem('rememberMe');
+            sessionStorage.setItem('sessionOnly', 'true');
+          }
           toast({
             title: 'Welcome back!',
             description: 'You have signed in successfully.',
@@ -324,6 +333,22 @@ export default function Auth() {
             <p className="text-sm text-destructive">{errors.password}</p>
           )}
         </div>
+
+        {!isSignUp && (
+          <div className="flex items-center space-x-2">
+            <Checkbox 
+              id="rememberMe" 
+              checked={rememberMe}
+              onCheckedChange={(checked) => setRememberMe(checked === true)}
+            />
+            <Label 
+              htmlFor="rememberMe" 
+              className="text-sm font-normal cursor-pointer"
+            >
+              Remember me
+            </Label>
+          </div>
+        )}
 
         {isSignUp && (
           <div className="space-y-2">
