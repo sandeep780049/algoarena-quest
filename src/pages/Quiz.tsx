@@ -167,19 +167,29 @@ export default function Quiz() {
         .rpc('get_contest_questions', { p_contest_id: id });
 
       if (questionsError) {
+        console.error('Error fetching questions:', questionsError);
         throw new Error(questionsError.message);
       }
       
-      if (questionsData && Array.isArray(questionsData) && questionsData.length > 0) {
-        const formattedQuestions: QuizQuestion[] = questionsData.map((q) => ({
-          id: q.id as string,
-          question_text: q.question_text as string,
-          code_block: q.code_block as string | null,
-          options: (Array.isArray(q.options) ? q.options : []) as string[],
-          option_mapping: q.option_mapping as Record<string, string> | undefined,
-        }));
-        setQuestions(formattedQuestions);
+      if (!questionsData || !Array.isArray(questionsData) || questionsData.length === 0) {
+        console.error('No questions found for contest:', id);
+        toast({
+          title: 'No Questions',
+          description: 'This contest has no questions available.',
+          variant: 'destructive',
+        });
+        navigate(`/contest/${id}`);
+        return;
       }
+      
+      const formattedQuestions: QuizQuestion[] = questionsData.map((q) => ({
+        id: q.id as string,
+        question_text: q.question_text as string,
+        code_block: q.code_block as string | null,
+        options: (Array.isArray(q.options) ? q.options : []) as string[],
+        option_mapping: q.option_mapping as Record<string, string> | undefined,
+      }));
+      setQuestions(formattedQuestions);
 
       // Load existing answers from submissions (in case user refreshed)
       if (user) {
@@ -200,11 +210,12 @@ export default function Quiz() {
 
       setStartedAt(new Date());
       
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Error fetching quiz:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to load quiz. Please try again.';
       toast({
         title: 'Error',
-        description: 'Failed to load quiz. Please try again.',
+        description: errorMessage,
         variant: 'destructive',
       });
     } finally {
@@ -296,11 +307,12 @@ export default function Quiz() {
         title: 'Quiz submitted!',
         description: `You scored ${data?.score || 0} out of ${data?.total_questions || 0} (${percentage}%)`,
       });
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Error submitting quiz:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to submit quiz. Please try again.';
       toast({
         title: 'Error',
-        description: 'Failed to submit quiz. Please try again.',
+        description: errorMessage,
         variant: 'destructive',
       });
       isSubmittingRef.current = false;
