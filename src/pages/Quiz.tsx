@@ -111,43 +111,19 @@ export default function Quiz() {
 
   const fetchQuizData = async () => {
     try {
-      const { data: contestData, error: contestError } = await supabase
-        .from('contests')
-        .select('*')
-        .eq('id', id)
-        .maybeSingle();
-
-      if (contestError) throw contestError;
-      if (!contestData) {
-        navigate('/contests');
-        return;
-      }
-
-      const contestTyped = contestData as Contest;
-      setContest(contestTyped);
-
-      const startTime = new Date(contestTyped.start_time);
-      const endTime = addMinutes(startTime, contestTyped.duration_minutes);
-      const now = new Date();
-
-      if (now < startTime || now >= endTime) {
-        toast({
-          title: 'Contest not available',
-          description: 'This contest is not currently accepting submissions.',
-          variant: 'destructive',
-        });
-        navigate(`/contest/${id}`);
-        return;
-      }
-
+      // FIRST: Check if user has already attempted this contest
       if (user) {
-        const { data: existingResultData } = await supabase.rpc('get_my_contest_result', {
+        const { data: existingResultData, error: resultError } = await supabase.rpc('get_my_contest_result', {
           p_contest_id: id
         });
 
+        if (resultError) {
+          console.error('Error checking existing result:', resultError);
+        }
+
         const existingResult = existingResultData as unknown as MyContestResultResponse | null;
 
-        if (existingResult) {
+        if (existingResult && existingResult.completed_at) {
           setHasCompleted(true);
           setQuizResult({
             score: existingResult.score || 0,
@@ -157,9 +133,59 @@ export default function Quiz() {
               : 0,
             timeTaken: existingResult.time_taken_seconds || 0,
           });
+          setContest({ id, name: 'Quiz', start_time: '', duration_minutes: 0, status: 'ended' } as Contest);
           setLoading(false);
+          toast({
+            title: 'Already Attempted',
+            description: 'You have already completed this contest. Showing your result.',
+          });
           return;
         }
+      }
+
+      const { data: contestData, error: contestError } = await supabase
+        .from('contests')
+        .select('*')
+        .eq('id', id)
+        .maybeSingle();
+
+      if (contestError) throw contestError;
+      if (!contestData) {
+        toast({
+          title: 'Contest not found',
+          description: 'This contest does not exist.',
+          variant: 'destructive',
+        });
+        navigate('/contests');
+        return;
+      }
+
+      const contestTyped = contestData as Contest;
+      setContest(contestTyped);
+
+      // Calculate actual contest status based on time (don't rely on stored status)
+      const startTime = new Date(contestTyped.start_time);
+      const endTime = addMinutes(startTime, contestTyped.duration_minutes);
+      const now = new Date();
+
+      if (now < startTime) {
+        toast({
+          title: 'Contest not started',
+          description: 'This contest has not started yet. Please wait for the start time.',
+          variant: 'destructive',
+        });
+        navigate(`/contest/${id}`);
+        return;
+      }
+
+      if (now >= endTime) {
+        toast({
+          title: 'Contest ended',
+          description: 'This contest has already ended. You cannot participate anymore.',
+          variant: 'destructive',
+        });
+        navigate(`/contest/${id}`);
+        return;
       }
 
       // SECURITY: Use secure RPC function with shuffled questions/options
@@ -226,6 +252,12 @@ export default function Quiz() {
   const saveAnswer = async (questionId: string, answerIndex: number) => {
     if (!user || !contest) return;
 
+    // Validate answer index is within valid range (0-3 for 4 options)
+    if (answerIndex < 0 || answerIndex > 3) {
+      console.error('Invalid answer index:', answerIndex);
+      return;
+    }
+
     try {
       const { data, error } = await supabase.rpc('save_quiz_answer', {
         p_contest_id: contest.id,
@@ -235,6 +267,8 @@ export default function Quiz() {
       
       if (error) {
         console.error('Error saving answer:', error);
+        // Don't show toast for save errors - it's auto-save
+        // The submission will handle the actual scoring
       }
     } catch (error) {
       console.error('Error saving answer:', error);
