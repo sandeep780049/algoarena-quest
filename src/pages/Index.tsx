@@ -491,7 +491,7 @@ export default function Index() {
             {!user && (
               <>
                 <a 
-                  href="/auth?mode=signup" 
+                  href="/auth/signup" 
                   className="group flex items-center gap-3 p-4 rounded-xl bg-card border border-border hover:border-primary/50 transition-all"
                 >
                   <Users className="h-6 w-6 text-primary group-hover:scale-110 transition-transform" />
