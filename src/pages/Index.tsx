@@ -464,8 +464,8 @@ export default function Index() {
       <section className="py-12 border-t border-border">
         <div className="container mx-auto px-4">
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            <a 
-              href="/contests" 
+            <Link 
+              to="/contests" 
               className="group flex items-center gap-3 p-4 rounded-xl bg-card border border-border hover:border-primary/50 transition-all"
             >
               <Trophy className="h-6 w-6 text-primary group-hover:scale-110 transition-transform" />
@@ -474,10 +474,10 @@ export default function Index() {
                 <p className="text-sm text-muted-foreground">Browse available challenges</p>
               </div>
               <ChevronRight className="h-5 w-5 ml-auto text-muted-foreground group-hover:text-primary transition-colors" />
-            </a>
+            </Link>
             
-            <a 
-              href="/leaderboard" 
+            <Link 
+              to="/leaderboard" 
               className="group flex items-center gap-3 p-4 rounded-xl bg-card border border-border hover:border-primary/50 transition-all"
             >
               <Code2 className="h-6 w-6 text-primary group-hover:scale-110 transition-transform" />
@@ -486,12 +486,12 @@ export default function Index() {
                 <p className="text-sm text-muted-foreground">See top performers</p>
               </div>
               <ChevronRight className="h-5 w-5 ml-auto text-muted-foreground group-hover:text-primary transition-colors" />
-            </a>
+            </Link>
             
             {!user && (
               <>
-                <a 
-                  href="/auth/signup" 
+                <Link 
+                  to="/auth/signup" 
                   className="group flex items-center gap-3 p-4 rounded-xl bg-card border border-border hover:border-primary/50 transition-all"
                 >
                   <Users className="h-6 w-6 text-primary group-hover:scale-110 transition-transform" />
@@ -500,10 +500,10 @@ export default function Index() {
                     <p className="text-sm text-muted-foreground">Join our community</p>
                   </div>
                   <ChevronRight className="h-5 w-5 ml-auto text-muted-foreground group-hover:text-primary transition-colors" />
-                </a>
+                </Link>
                 
-                <a 
-                  href="/auth" 
+                <Link 
+                  to="/auth" 
                   className="group flex items-center gap-3 p-4 rounded-xl bg-card border border-border hover:border-primary/50 transition-all"
                 >
                   <Zap className="h-6 w-6 text-primary group-hover:scale-110 transition-transform" />
@@ -512,7 +512,7 @@ export default function Index() {
                     <p className="text-sm text-muted-foreground">Access your account</p>
                   </div>
                   <ChevronRight className="h-5 w-5 ml-auto text-muted-foreground group-hover:text-primary transition-colors" />
-                </a>
+                </Link>
               </>
             )}
           </div>

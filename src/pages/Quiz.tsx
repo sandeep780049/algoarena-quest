@@ -384,12 +384,11 @@ export default function Quiz() {
   }, [user, contest, startedAt, answers, quizResult, hasCompleted, toast]);
 
   const handleSubmitClick = () => {
-    // Check if there's still time remaining
-    if (timeRemaining > 60) {
-      // More than 1 minute left - show confirmation
+    // Always show early-confirmation dialog when time is remaining
+    if (timeRemaining > 0) {
       setShowEarlySubmitDialog(true);
     } else {
-      // Less than 1 minute or time's up - submit directly
+      // Time's up - submit directly
       handleSubmit();
     }
   };
@@ -613,17 +612,14 @@ export default function Quiz() {
               Previous
             </Button>
 
-            <div className="flex gap-2">
-              {currentIndex === questions.length - 1 && (
-                <Button 
-                  onClick={handleSubmitClick}
-                  disabled={submitting}
-                  className="bg-primary"
-                >
-                  {submitting ? 'Submitting...' : 'Submit Quiz'}
-                </Button>
-              )}
-            </div>
+            {/* Always-visible Submit Button */}
+            <Button 
+              onClick={handleSubmitClick}
+              disabled={submitting}
+              className="bg-primary"
+            >
+              {submitting ? 'Submitting...' : 'Submit Quiz'}
+            </Button>
 
             <Button
               variant="outline"
