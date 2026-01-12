@@ -164,8 +164,10 @@ export default function Quiz() {
       setContest(contestTyped);
 
       // Calculate actual contest status based on time (don't rely on stored status)
+      // Keep frontend aligned with backend rules (includes 1-minute grace period after end).
       const startTime = new Date(contestTyped.start_time);
       const endTime = addMinutes(startTime, contestTyped.duration_minutes);
+      const endTimeWithGrace = addMinutes(endTime, 1);
       const now = new Date();
 
       if (now < startTime) {
@@ -178,10 +180,11 @@ export default function Quiz() {
         return;
       }
 
-      if (now >= endTime) {
+      // Allow users who are already in-progress to load/submit during the grace window.
+      if (now >= endTimeWithGrace) {
         toast({
           title: 'Contest ended',
-          description: 'This contest has already ended. You cannot participate anymore.',
+          description: 'This contest has ended. You cannot participate anymore.',
           variant: 'destructive',
         });
         navigate(`/contest/${id}`);
@@ -294,13 +297,38 @@ export default function Quiz() {
     setSubmitting(true);
 
     try {
-      const { data: responseData, error } = await supabase.rpc('submit_quiz_answers', {
-        p_contest_id: contest.id,
-        p_answers: answers,
-        p_started_at: startedAt?.toISOString() || new Date().toISOString()
-      });
+      // Retry once on transient/network failures
+      let responseData: unknown = null;
+      let lastError: unknown = null;
 
-      if (error) throw error;
+      for (let attempt = 0; attempt < 2; attempt++) {
+        const { data, error } = await supabase.rpc('submit_quiz_answers', {
+          p_contest_id: contest.id,
+          p_answers: answers,
+          p_started_at: startedAt?.toISOString() || new Date().toISOString(),
+        });
+
+        if (!error) {
+          responseData = data;
+          lastError = null;
+          break;
+        }
+
+        lastError = error;
+        const msg = (error as { message?: string })?.message || '';
+        const isTransient =
+          msg.includes('Failed to fetch') ||
+          msg.includes('NetworkError') ||
+          msg.includes('timeout') ||
+          msg.includes('502') ||
+          msg.includes('503') ||
+          msg.includes('504');
+
+        if (!isTransient || attempt === 1) break;
+        await new Promise((r) => setTimeout(r, 600));
+      }
+
+      if (lastError) throw lastError;
 
       const data = responseData as SubmitQuizResponse | null;
 
