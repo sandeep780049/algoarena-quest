@@ -91,10 +91,13 @@ export default function Leaderboard() {
   const [loading, setLoading] = useState(true);
   const [isContestLocked, setIsContestLocked] = useState(false);
   const [certificates, setCertificates] = useState<Record<string, CertificateData>>({});
+  const [userCompletedContests, setUserCompletedContests] = useState<number | null>(null);
+  const isGlobalLeaderboardLocked = !selectedContest && userCompletedContests === 0 && !isAdmin;
 
   useEffect(() => {
     fetchContests();
-  }, []);
+    fetchUserCompletedContests();
+  }, [user]);
 
   useEffect(() => {
     if (selectedContest) {
@@ -122,6 +125,30 @@ export default function Leaderboard() {
       .order('start_time', { ascending: false });
     
     setContests((data as Contest[]) || []);
+  };
+
+  const fetchUserCompletedContests = async () => {
+    if (!user) {
+      setUserCompletedContests(0);
+      return;
+    }
+    try {
+      const { count, error } = await supabase
+        .from('contest_results')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .not('completed_at', 'is', null);
+
+      if (error) {
+        console.error('Error fetching user completed contests:', error);
+        setUserCompletedContests(0);
+        return;
+      }
+      setUserCompletedContests(count ?? 0);
+    } catch (error) {
+      console.error('Error fetching user completed contests:', error);
+      setUserCompletedContests(0);
+    }
   };
 
   const fetchLeaderboard = async (contestId: string) => {
@@ -418,6 +445,21 @@ export default function Leaderboard() {
           </div>
         )}
 
+        {/* Global Leaderboard Locked Notice */}
+        {isGlobalLeaderboardLocked && (
+          <div className="mb-8 p-6 rounded-xl bg-glow-warning/10 border border-glow-warning/30">
+            <div className="flex items-center gap-3">
+              <Lock className="h-6 w-6 text-glow-warning" />
+              <div>
+                <h3 className="font-semibold text-glow-warning">Complete Your First Contest</h3>
+                <p className="text-sm text-muted-foreground">
+                  The global leaderboard will unlock after you complete your first contest.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Leaderboard */}
         {loading ? (
           <div className="space-y-4">
@@ -432,6 +474,20 @@ export default function Leaderboard() {
             <p className="text-muted-foreground">
               The leaderboard will be revealed after the contest ends.
             </p>
+          </div>
+        ) : isGlobalLeaderboardLocked ? (
+          <div className="text-center py-20">
+            <Lock className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+            <h3 className="text-xl font-semibold mb-2">Global Leaderboard Locked</h3>
+            <p className="text-muted-foreground mb-4">
+              Complete at least one contest to unlock the global leaderboard.
+            </p>
+            <Link to="/contests">
+              <Button>
+                <Trophy className="h-4 w-4 mr-2" />
+                Browse Contests
+              </Button>
+            </Link>
           </div>
         ) : entries.length > 0 ? (
           <div className="space-y-8">

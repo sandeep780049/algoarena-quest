@@ -15,8 +15,15 @@ const signInSchema = z.object({
   password: z.string().min(6, 'Password must be at least 6 characters'),
 });
 
-const signUpSchema = signInSchema.extend({
+const passwordRegex = /^(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]).{6,}$/;
+
+const signUpSchema = z.object({
+  email: z.string().email('Please enter a valid email'),
   username: z.string().min(3, 'Username must be at least 3 characters').max(20, 'Username must be less than 20 characters'),
+  password: z.string().min(6, 'Password must be at least 6 characters').regex(
+    passwordRegex,
+    'Password must contain at least 1 uppercase letter, 1 digit, and 1 symbol'
+  ),
   confirmPassword: z.string(),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords don't match",
@@ -334,6 +341,11 @@ export default function Auth() {
               {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             </button>
           </div>
+          {isSignUp && (
+            <p className="text-xs text-muted-foreground">
+              At least 6 characters with 1 uppercase, 1 digit, and 1 symbol (!@#$%...)
+            </p>
+          )}
           {errors.password && (
             <p className="text-sm text-destructive">{errors.password}</p>
           )}
