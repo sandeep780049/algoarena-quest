@@ -15,14 +15,15 @@ const signInSchema = z.object({
   password: z.string().min(6, 'Password must be at least 6 characters'),
 });
 
-const passwordRegex = /^(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]).{6,}$/;
+// Password must have: 1 uppercase, 1 lowercase, 1 digit, 1 symbol, min 6 chars
+const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]).{6,}$/;
 
 const signUpSchema = z.object({
   email: z.string().email('Please enter a valid email'),
   username: z.string().min(3, 'Username must be at least 3 characters').max(20, 'Username must be less than 20 characters'),
   password: z.string().min(6, 'Password must be at least 6 characters').regex(
     passwordRegex,
-    'Password must contain at least 1 uppercase letter, 1 digit, and 1 symbol'
+    'Password must have 1 uppercase, 1 lowercase, 1 digit, and 1 symbol'
   ),
   confirmPassword: z.string(),
 }).refine((data) => data.password === data.confirmPassword, {
@@ -343,7 +344,7 @@ export default function Auth() {
           </div>
           {isSignUp && (
             <p className="text-xs text-muted-foreground">
-              At least 6 characters with 1 uppercase, 1 digit, and 1 symbol (!@#$%...)
+              Min 6 characters: 1 UPPERCASE + 1 lowercase + 1 digit + 1 symbol (!@#$%...)
             </p>
           )}
           {errors.password && (
