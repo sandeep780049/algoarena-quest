@@ -95,6 +95,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signUp = async (email: string, password: string, username: string) => {
+    // Server-side password validation before calling Supabase
+    // Must have: at least 6 chars, 1 uppercase, 1 lowercase, 1 digit, 1 symbol
+    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]).{6,}$/;
+    
+    if (!passwordRegex.test(password)) {
+      return { 
+        error: new Error('Password must be at least 6 characters with 1 uppercase, 1 lowercase, 1 digit, and 1 symbol') 
+      };
+    }
+
     const redirectUrl = `${window.location.origin}/`;
     
     const { error } = await supabase.auth.signUp({
