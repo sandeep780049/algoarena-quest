@@ -370,16 +370,30 @@ export default function Quiz() {
         description: `You scored ${data?.score || 0} out of ${data?.total_questions || 0} (${percentage}%)`,
       });
     } catch (error: unknown) {
+      const errorMessage = (() => {
+        if (error instanceof Error) return error.message;
+        if (typeof error === 'string') return error;
+        if (error && typeof error === 'object') {
+          const anyErr = error as Record<string, unknown>;
+          const msg = anyErr.message;
+          const details = anyErr.details;
+          const hint = anyErr.hint;
+          if (typeof msg === 'string' && msg.trim()) return msg;
+          if (typeof details === 'string' && details.trim()) return details;
+          if (typeof hint === 'string' && hint.trim()) return hint;
+        }
+        return 'Failed to submit quiz. Please try again.';
+      })();
+
       console.error('Error submitting quiz:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Failed to submit quiz. Please try again.';
+
       toast({
         title: 'Error',
         description: errorMessage,
         variant: 'destructive',
       });
+
       isSubmittingRef.current = false;
-    } finally {
-      setSubmitting(false);
     }
   }, [user, contest, startedAt, answers, quizResult, hasCompleted, toast]);
 
