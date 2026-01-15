@@ -6,14 +6,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Terminal, Eye, EyeOff, ArrowLeft, Mail, RefreshCw } from 'lucide-react';
+import { Terminal, Eye, EyeOff, ArrowLeft } from 'lucide-react';
 import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
-import {
-  InputOTP,
-  InputOTPGroup,
-  InputOTPSlot,
-} from "@/components/ui/input-otp";
 
 const signInSchema = z.object({
   email: z.string().email('Please enter a valid email'),
@@ -36,7 +31,7 @@ const signUpSchema = z.object({
   path: ["confirmPassword"],
 });
 
-type AuthView = 'signin' | 'signup' | 'forgot-password' | 'verify-otp';
+type AuthView = 'signin' | 'signup' | 'forgot-password';
 
 export default function Auth() {
   const location = useLocation();
@@ -54,8 +49,6 @@ export default function Auth() {
   const [rememberMe, setRememberMe] = useState(true);
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [otpValue, setOtpValue] = useState('');
-  const [resendCooldown, setResendCooldown] = useState(0);
   
   const { signIn, signUp, user } = useAuth();
   const navigate = useNavigate();
@@ -74,14 +67,6 @@ export default function Auth() {
       }
     }
   }, [user, navigate]);
-
-  // Resend cooldown timer
-  useEffect(() => {
-    if (resendCooldown > 0) {
-      const timer = setTimeout(() => setResendCooldown(resendCooldown - 1), 1000);
-      return () => clearTimeout(timer);
-    }
-  }, [resendCooldown]);
 
   const validateForm = () => {
     setErrors({});
@@ -115,98 +100,6 @@ export default function Auth() {
       .maybeSingle();
     
     return !!data;
-  };
-
-  const sendOTP = async () => {
-    setLoading(true);
-    try {
-      const { error } = await supabase.functions.invoke('send-otp', {
-        body: { email, username }
-      });
-
-      if (error) {
-        throw error;
-      }
-
-      toast({
-        title: 'Verification code sent!',
-        description: `We've sent a 6-digit code to ${email}`,
-      });
-      setResendCooldown(60); // 60 second cooldown
-    } catch (error) {
-      console.error('Error sending OTP:', error);
-      toast({
-        title: 'Failed to send code',
-        description: 'Please try again later.',
-        variant: 'destructive',
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const verifyOTPAndSignUp = async () => {
-    if (otpValue.length !== 6) {
-      toast({
-        title: 'Invalid code',
-        description: 'Please enter the 6-digit code.',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    setLoading(true);
-    try {
-      // Verify OTP
-      const { data: verifyData, error: verifyError } = await supabase.functions.invoke('verify-otp', {
-        body: { email, otp: otpValue }
-      });
-
-      if (verifyError || !verifyData?.success) {
-        toast({
-          title: 'Invalid code',
-          description: verifyData?.error || 'The code is invalid or expired. Please request a new one.',
-          variant: 'destructive',
-        });
-        setLoading(false);
-        return;
-      }
-
-      // OTP verified, now create the account
-      const { error: signUpError } = await signUp(email, password, username);
-      
-      if (signUpError) {
-        if (signUpError.message.includes('already registered')) {
-          toast({
-            title: 'Account exists',
-            description: 'This email is already registered. Please sign in instead.',
-            variant: 'destructive',
-          });
-          setView('signin');
-        } else {
-          toast({
-            title: 'Sign up failed',
-            description: signUpError.message,
-            variant: 'destructive',
-          });
-        }
-      } else {
-        toast({
-          title: 'Welcome to AlgoArena!',
-          description: 'Your account has been created successfully.',
-        });
-        navigate('/');
-      }
-    } catch (error) {
-      console.error('Error during verification:', error);
-      toast({
-        title: 'Verification failed',
-        description: 'Something went wrong. Please try again.',
-        variant: 'destructive',
-      });
-    } finally {
-      setLoading(false);
-    }
   };
 
   const handlePasswordReset = async (e: React.FormEvent) => {
@@ -270,16 +163,31 @@ export default function Auth() {
           return;
         }
 
-        // Check if email already registered
-        const { data: existingProfile } = await supabase
-          .from('profiles')
-          .select('id')
-          .eq('id', email)
-          .maybeSingle();
-
-        // Send OTP and switch to verification view
-        await sendOTP();
-        setView('verify-otp');
+        // Create the account directly
+        const { error: signUpError } = await signUp(email, password, username);
+        
+        if (signUpError) {
+          if (signUpError.message.includes('already registered')) {
+            toast({
+              title: 'Account exists',
+              description: 'This email is already registered. Please sign in instead.',
+              variant: 'destructive',
+            });
+            setView('signin');
+          } else {
+            toast({
+              title: 'Sign up failed',
+              description: signUpError.message,
+              variant: 'destructive',
+            });
+          }
+        } else {
+          toast({
+            title: 'Welcome to AlgoArena!',
+            description: 'Your account has been created successfully.',
+          });
+          navigate('/');
+        }
       } else {
         const { error } = await signIn(email, password);
         if (error) {
@@ -307,83 +215,6 @@ export default function Auth() {
       setLoading(false);
     }
   };
-
-  const renderOTPVerification = () => (
-    <>
-      <div className="text-center mb-8">
-        <div className="inline-flex items-center gap-2 mb-4">
-          <Terminal className="h-8 w-8 text-primary" />
-          <span className="font-bold text-xl">
-            <span className="text-primary">JC</span> AlgoArena
-          </span>
-        </div>
-        <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
-          <Mail className="h-8 w-8 text-primary" />
-        </div>
-        <h1 className="text-2xl font-bold">Verify your email</h1>
-        <p className="text-muted-foreground mt-2">
-          We've sent a 6-digit code to
-        </p>
-        <p className="text-foreground font-medium">{email}</p>
-      </div>
-
-      <div className="space-y-6">
-        <div className="flex justify-center">
-          <InputOTP
-            maxLength={6}
-            value={otpValue}
-            onChange={(value) => setOtpValue(value)}
-          >
-            <InputOTPGroup>
-              <InputOTPSlot index={0} />
-              <InputOTPSlot index={1} />
-              <InputOTPSlot index={2} />
-              <InputOTPSlot index={3} />
-              <InputOTPSlot index={4} />
-              <InputOTPSlot index={5} />
-            </InputOTPGroup>
-          </InputOTP>
-        </div>
-
-        <Button 
-          onClick={verifyOTPAndSignUp} 
-          className="w-full" 
-          disabled={loading || otpValue.length !== 6}
-        >
-          {loading ? 'Verifying...' : 'Verify & Create Account'}
-        </Button>
-
-        <div className="text-center space-y-2">
-          <p className="text-sm text-muted-foreground">
-            Didn't receive the code?
-          </p>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={sendOTP}
-            disabled={loading || resendCooldown > 0}
-            className="gap-2"
-          >
-            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-            {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend Code'}
-          </Button>
-        </div>
-
-        <div className="text-center">
-          <button
-            type="button"
-            onClick={() => {
-              setView('signup');
-              setOtpValue('');
-            }}
-            className="text-primary hover:underline font-medium text-sm"
-          >
-            ← Back to sign up
-          </button>
-        </div>
-      </div>
-    </>
-  );
 
   const renderForgotPassword = () => (
     <>
@@ -594,7 +425,6 @@ export default function Auth() {
 
         <div className="bg-card border border-border rounded-2xl p-8 shadow-xl">
           {view === 'forgot-password' && renderForgotPassword()}
-          {view === 'verify-otp' && renderOTPVerification()}
           {(view === 'signin' || view === 'signup') && renderMainAuth()}
         </div>
       </div>
