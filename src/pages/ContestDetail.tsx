@@ -14,6 +14,13 @@ interface MyContestResultResponse {
   time_taken_seconds: number;
   completed_at: string;
 }
+
+interface Profile {
+  id: string;
+  username: string;
+  avatar_url: string | null;
+}
+
 import { 
   Clock, 
   Calendar, 
@@ -208,6 +215,33 @@ export default function ContestDetail() {
         setIsRegistered(true);
         setRegistrationCount(prev => prev + 1);
         toast({ title: 'Registered!', description: 'You have successfully registered for this contest.' });
+
+        // Send confirmation email
+        try {
+          const { data: profileData } = await supabase
+            .from('profiles')
+            .select('username')
+            .eq('id', user.id)
+            .single();
+
+          const startTime = new Date(contest.start_time);
+          
+          await supabase.functions.invoke('send-contest-email', {
+            body: {
+              type: 'registration',
+              email: user.email,
+              username: profileData?.username || 'Participant',
+              contestName: contest.name,
+              contestDate: format(startTime, 'MMMM d, yyyy'),
+              contestTime: format(startTime, 'h:mm a'),
+              contestDuration: contest.duration_minutes,
+              contestId: contest.id,
+            }
+          });
+        } catch (emailError) {
+          console.error('Failed to send confirmation email:', emailError);
+          // Don't show error to user - registration was successful
+        }
       }
     } catch (error) {
       console.error('Error registering:', error);
