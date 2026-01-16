@@ -305,36 +305,56 @@ export default function Contests() {
           </div>
         )}
 
-        {/* Stats */}
+        {/* Stats - Clickable to switch tabs */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-          <div className="p-4 rounded-xl bg-glow-success/10 border border-glow-success/30">
+          <button 
+            onClick={() => setActiveTab('live')}
+            className={`p-4 rounded-xl bg-glow-success/10 border transition-all text-left ${
+              activeTab === 'live' ? 'border-glow-success ring-2 ring-glow-success/30' : 'border-glow-success/30 hover:border-glow-success/60'
+            }`}
+          >
             <div className="flex items-center gap-2 text-glow-success mb-1">
               <Play className="h-4 w-4" />
               <span className="text-sm font-medium">Live Now</span>
             </div>
             <p className="text-2xl font-bold">{liveContests.length}</p>
-          </div>
-          <div className="p-4 rounded-xl bg-glow-warning/10 border border-glow-warning/30">
+          </button>
+          <button 
+            onClick={() => setActiveTab('upcoming')}
+            className={`p-4 rounded-xl bg-glow-warning/10 border transition-all text-left ${
+              activeTab === 'upcoming' ? 'border-glow-warning ring-2 ring-glow-warning/30' : 'border-glow-warning/30 hover:border-glow-warning/60'
+            }`}
+          >
             <div className="flex items-center gap-2 text-glow-warning mb-1">
               <Calendar className="h-4 w-4" />
               <span className="text-sm font-medium">Upcoming</span>
             </div>
             <p className="text-2xl font-bold">{upcomingContests.length}</p>
-          </div>
-          <div className="p-4 rounded-xl bg-muted border border-border">
+          </button>
+          <button 
+            onClick={() => setActiveTab('past')}
+            className={`p-4 rounded-xl bg-muted border transition-all text-left ${
+              activeTab === 'past' ? 'border-muted-foreground ring-2 ring-muted-foreground/30' : 'border-border hover:border-muted-foreground/60'
+            }`}
+          >
             <div className="flex items-center gap-2 text-muted-foreground mb-1">
               <CheckCircle className="h-4 w-4" />
               <span className="text-sm font-medium">Past</span>
             </div>
             <p className="text-2xl font-bold">{pastContests.length}</p>
-          </div>
-          <div className="p-4 rounded-xl bg-primary/10 border border-primary/30">
+          </button>
+          <button 
+            onClick={() => setActiveTab('my')}
+            className={`p-4 rounded-xl bg-primary/10 border transition-all text-left ${
+              activeTab === 'my' ? 'border-primary ring-2 ring-primary/30' : 'border-primary/30 hover:border-primary/60'
+            }`}
+          >
             <div className="flex items-center gap-2 text-primary mb-1">
               <Trophy className="h-4 w-4" />
               <span className="text-sm font-medium">My Contests</span>
             </div>
             <p className="text-2xl font-bold">{myContests.length}</p>
-          </div>
+          </button>
         </div>
 
         {/* Tabs */}
