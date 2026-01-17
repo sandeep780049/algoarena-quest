@@ -35,27 +35,9 @@ function generateOTP(): string {
   return Math.floor(100000 + Math.random() * 900000).toString();
 }
 
-// Simple in-memory rate limiting (per-instance)
-const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
+// Rate limit constants
 const RATE_LIMIT_MAX = 3; // Max 3 requests per email
-const RATE_LIMIT_WINDOW_MS = 5 * 60 * 1000; // 5 minutes
-
-function checkRateLimit(email: string): boolean {
-  const now = Date.now();
-  const record = rateLimitMap.get(email);
-  
-  if (!record || now > record.resetTime) {
-    rateLimitMap.set(email, { count: 1, resetTime: now + RATE_LIMIT_WINDOW_MS });
-    return true;
-  }
-  
-  if (record.count >= RATE_LIMIT_MAX) {
-    return false;
-  }
-  
-  record.count++;
-  return true;
-}
+const RATE_LIMIT_WINDOW_SECONDS = 5 * 60; // 5 minutes
 
 const handler = async (req: Request): Promise<Response> => {
   const origin = req.headers.get("origin");
@@ -85,19 +67,33 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    // Check rate limit
-    if (!checkRateLimit(email.toLowerCase())) {
+    // Create Supabase client with service role for rate limiting
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Check persistent rate limit using database function
+    const rateLimitKey = `send_otp:${email.toLowerCase()}`;
+    const { data: rateLimitResult, error: rateLimitError } = await supabase.rpc(
+      'check_rate_limit',
+      {
+        p_key: rateLimitKey,
+        p_max_count: RATE_LIMIT_MAX,
+        p_window_seconds: RATE_LIMIT_WINDOW_SECONDS,
+        p_lockout_seconds: null // No lockout for OTP requests, just rate limit
+      }
+    );
+
+    if (rateLimitError) {
+      console.error("Rate limit check error:", rateLimitError);
+      // Continue without rate limiting if there's a DB error
+    } else if (rateLimitResult && !rateLimitResult.allowed) {
       console.log("Rate limit exceeded for:", email);
       return new Response(
         JSON.stringify({ error: "Too many requests. Please try again in a few minutes." }),
         { status: 429, headers: { "Content-Type": "application/json", ...corsHeaders } }
       );
     }
-
-    // Create Supabase client
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     // Generate OTP
     const otpCode = generateOTP();

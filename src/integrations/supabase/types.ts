@@ -308,6 +308,27 @@ export type Database = {
         }
         Relationships: []
       }
+      rate_limits: {
+        Row: {
+          count: number
+          key: string
+          lockout_until: string | null
+          reset_time: string
+        }
+        Insert: {
+          count?: number
+          key: string
+          lockout_until?: string | null
+          reset_time: string
+        }
+        Update: {
+          count?: number
+          key?: string
+          lockout_until?: string | null
+          reset_time?: string
+        }
+        Relationships: []
+      }
       submissions: {
         Row: {
           contest_id: string
@@ -411,7 +432,18 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      check_rate_limit: {
+        Args: {
+          p_key: string
+          p_lockout_seconds?: number
+          p_max_count: number
+          p_window_seconds: number
+        }
+        Returns: Json
+      }
       cleanup_expired_otps: { Args: never; Returns: undefined }
+      cleanup_expired_rate_limits: { Args: never; Returns: undefined }
+      clear_rate_limit: { Args: { p_key: string }; Returns: undefined }
       generate_certificate: {
         Args: { p_contest_id: string; p_user_id: string }
         Returns: Json
