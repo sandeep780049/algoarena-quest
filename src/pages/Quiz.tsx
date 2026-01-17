@@ -252,11 +252,11 @@ export default function Quiz() {
     }
   };
 
-  const saveAnswer = async (questionId: string, answerIndex: number) => {
+  const saveAnswer = async (questionId: string, answerIndex: number | null) => {
     if (!user || !contest) return;
 
-    // Validate answer index is within valid range (0-3 for 4 options)
-    if (answerIndex < 0 || answerIndex > 3) {
+    // Validate answer index is within valid range (0-3 for 4 options) or null for deselect
+    if (answerIndex !== null && (answerIndex < 0 || answerIndex > 3)) {
       console.error('Invalid answer index:', answerIndex);
       return;
     }
@@ -265,7 +265,7 @@ export default function Quiz() {
       const { data, error } = await supabase.rpc('save_quiz_answer', {
         p_contest_id: contest.id,
         p_question_id: questionId,
-        p_selected_answer: answerIndex
+        p_selected_answer: answerIndex ?? -1 // Use -1 to signal deletion
       });
       
       if (error) {
@@ -282,12 +282,23 @@ export default function Quiz() {
     const question = questions[currentIndex];
     if (!question || hasCompleted || quizResult) return;
 
-    setAnswers(prev => ({
-      ...prev,
-      [question.id]: answerIndex,
-    }));
-
-    saveAnswer(question.id, answerIndex);
+    const currentAnswer = answers[question.id];
+    
+    // Toggle: if same option clicked, deselect it
+    if (currentAnswer === answerIndex) {
+      setAnswers(prev => {
+        const newAnswers = { ...prev };
+        delete newAnswers[question.id];
+        return newAnswers;
+      });
+      saveAnswer(question.id, null);
+    } else {
+      setAnswers(prev => ({
+        ...prev,
+        [question.id]: answerIndex,
+      }));
+      saveAnswer(question.id, answerIndex);
+    }
   };
 
   const handleSubmit = useCallback(async () => {
