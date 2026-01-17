@@ -35,6 +35,28 @@ function generateOTP(): string {
   return Math.floor(100000 + Math.random() * 900000).toString();
 }
 
+// Simple in-memory rate limiting (per-instance)
+const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
+const RATE_LIMIT_MAX = 3; // Max 3 requests per email
+const RATE_LIMIT_WINDOW_MS = 5 * 60 * 1000; // 5 minutes
+
+function checkRateLimit(email: string): boolean {
+  const now = Date.now();
+  const record = rateLimitMap.get(email);
+  
+  if (!record || now > record.resetTime) {
+    rateLimitMap.set(email, { count: 1, resetTime: now + RATE_LIMIT_WINDOW_MS });
+    return true;
+  }
+  
+  if (record.count >= RATE_LIMIT_MAX) {
+    return false;
+  }
+  
+  record.count++;
+  return true;
+}
+
 const handler = async (req: Request): Promise<Response> => {
   const origin = req.headers.get("origin");
   const corsHeaders = getCorsHeaders(origin);
@@ -51,6 +73,24 @@ const handler = async (req: Request): Promise<Response> => {
       return new Response(
         JSON.stringify({ error: "Email is required" }),
         { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return new Response(
+        JSON.stringify({ error: "Invalid email format" }),
+        { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
+    // Check rate limit
+    if (!checkRateLimit(email.toLowerCase())) {
+      console.log("Rate limit exceeded for:", email);
+      return new Response(
+        JSON.stringify({ error: "Too many requests. Please try again in a few minutes." }),
+        { status: 429, headers: { "Content-Type": "application/json", ...corsHeaders } }
       );
     }
 

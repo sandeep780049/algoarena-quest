@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 import { Resend } from "https://esm.sh/resend@2.0.0";
 
 const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
@@ -32,6 +33,36 @@ interface ContestEmailRequest {
   contestTime: string;
   contestDuration: number;
   contestId?: string;
+}
+
+// Helper function to validate authenticated user
+async function validateAuth(req: Request, corsHeaders: Record<string, string>): Promise<{ user: { id: string; email?: string } } | Response> {
+  const authHeader = req.headers.get('Authorization');
+  if (!authHeader?.startsWith('Bearer ')) {
+    return new Response(
+      JSON.stringify({ error: 'Unauthorized - Missing or invalid authorization header' }),
+      { status: 401, headers: { "Content-Type": "application/json", ...corsHeaders } }
+    );
+  }
+
+  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+  const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+  
+  const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+    global: { headers: { Authorization: authHeader } }
+  });
+
+  const { data: { user }, error } = await supabase.auth.getUser();
+  
+  if (error || !user) {
+    console.error("Auth validation failed:", error);
+    return new Response(
+      JSON.stringify({ error: 'Unauthorized - Invalid token' }),
+      { status: 401, headers: { "Content-Type": "application/json", ...corsHeaders } }
+    );
+  }
+
+  return { user: { id: user.id, email: user.email } };
 }
 
 const getRegistrationEmailHtml = (username: string, contestName: string, contestDate: string, contestTime: string, duration: number) => `
@@ -279,11 +310,26 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
+    // Validate user is authenticated
+    const authResult = await validateAuth(req, corsHeaders);
+    if (authResult instanceof Response) {
+      return authResult; // Return the error response
+    }
+    
     const { type, email, username, contestName, contestDate, contestTime, contestDuration }: ContestEmailRequest = await req.json();
 
     if (!email || !type || !contestName) {
       return new Response(
         JSON.stringify({ error: "Missing required fields" }),
+        { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return new Response(
+        JSON.stringify({ error: "Invalid email format" }),
         { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
       );
     }
