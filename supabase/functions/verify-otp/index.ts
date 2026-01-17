@@ -26,6 +26,40 @@ interface VerifyOTPRequest {
   otp: string;
 }
 
+// Simple in-memory rate limiting for brute force protection
+const rateLimitMap = new Map<string, { count: number; resetTime: number; lockoutUntil?: number }>();
+const RATE_LIMIT_MAX = 5; // Max 5 attempts per email
+const RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000; // 10 minutes
+const LOCKOUT_DURATION_MS = 30 * 60 * 1000; // 30 minute lockout after max attempts
+
+function checkRateLimit(email: string): { allowed: boolean; message?: string } {
+  const now = Date.now();
+  const record = rateLimitMap.get(email);
+  
+  // Check if locked out
+  if (record?.lockoutUntil && now < record.lockoutUntil) {
+    const remainingMinutes = Math.ceil((record.lockoutUntil - now) / 60000);
+    return { allowed: false, message: `Too many failed attempts. Try again in ${remainingMinutes} minutes.` };
+  }
+  
+  if (!record || now > record.resetTime) {
+    rateLimitMap.set(email, { count: 1, resetTime: now + RATE_LIMIT_WINDOW_MS });
+    return { allowed: true };
+  }
+  
+  if (record.count >= RATE_LIMIT_MAX) {
+    record.lockoutUntil = now + LOCKOUT_DURATION_MS;
+    return { allowed: false, message: "Too many failed attempts. Account temporarily locked for 30 minutes." };
+  }
+  
+  record.count++;
+  return { allowed: true };
+}
+
+function resetRateLimit(email: string): void {
+  rateLimitMap.delete(email);
+}
+
 const handler = async (req: Request): Promise<Response> => {
   const origin = req.headers.get("origin");
   const corsHeaders = getCorsHeaders(origin);
@@ -42,6 +76,24 @@ const handler = async (req: Request): Promise<Response> => {
       return new Response(
         JSON.stringify({ error: "Email and OTP are required" }),
         { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
+    // Validate OTP format (6 digits only)
+    if (!/^\d{6}$/.test(otp)) {
+      return new Response(
+        JSON.stringify({ error: "Invalid OTP format" }),
+        { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
+    // Check rate limit for brute force protection
+    const rateLimitResult = checkRateLimit(email.toLowerCase());
+    if (!rateLimitResult.allowed) {
+      console.log("Rate limit/lockout for:", email);
+      return new Response(
+        JSON.stringify({ error: rateLimitResult.message }),
+        { status: 429, headers: { "Content-Type": "application/json", ...corsHeaders } }
       );
     }
 
@@ -86,6 +138,9 @@ const handler = async (req: Request): Promise<Response> => {
       .eq("email", email)
       .neq("id", otpRecord.id);
 
+    // Reset rate limit on successful verification
+    resetRateLimit(email.toLowerCase());
+    
     console.log("OTP verified successfully for:", email);
 
     return new Response(
