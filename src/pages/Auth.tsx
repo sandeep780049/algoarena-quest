@@ -486,22 +486,6 @@ export default function Auth() {
           )}
         </div>
 
-        {!isSignUp && (
-          <div className="flex items-center space-x-2">
-            <Checkbox 
-              id="rememberMe" 
-              checked={rememberMe}
-              onCheckedChange={(checked) => setRememberMe(checked === true)}
-            />
-            <Label 
-              htmlFor="rememberMe" 
-              className="text-sm font-normal cursor-pointer"
-            >
-              Remember me
-            </Label>
-          </div>
-        )}
-
         {isSignUp && (
           <div className="space-y-2">
             <Label htmlFor="confirmPassword">Confirm Password</Label>
@@ -518,6 +502,20 @@ export default function Auth() {
             )}
           </div>
         )}
+
+        <div className="flex items-center space-x-2">
+          <Checkbox 
+            id="rememberMe" 
+            checked={rememberMe}
+            onCheckedChange={(checked) => setRememberMe(checked === true)}
+          />
+          <Label 
+            htmlFor="rememberMe" 
+            className="text-sm font-normal cursor-pointer"
+          >
+            Remember me
+          </Label>
+        </div>
 
         <Button type="submit" className="w-full" disabled={loading}>
           {loading ? 'Please wait...' : (isSignUp ? 'Create Account' : 'Sign In')}
