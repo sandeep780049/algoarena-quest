@@ -31,7 +31,7 @@ const signUpSchema = z.object({
   path: ["confirmPassword"],
 });
 
-type AuthView = 'signin' | 'signup' | 'forgot-password';
+type AuthView = 'signin' | 'signup' | 'forgot-password' | 'reset-password';
 
 export default function Auth() {
   const location = useLocation();
@@ -44,15 +44,30 @@ export default function Auth() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmNewPassword, setConfirmNewPassword] = useState('');
   const [username, setUsername] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [isRecoverySession, setIsRecoverySession] = useState(false);
   
   const { signIn, signUp, user } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+
+  // Check for recovery session from password reset email
+  useEffect(() => {
+    const hashParams = new URLSearchParams(window.location.hash.substring(1));
+    const accessToken = hashParams.get('access_token');
+    const type = hashParams.get('type');
+    
+    if (accessToken && type === 'recovery') {
+      setIsRecoverySession(true);
+      setView('reset-password');
+    }
+  }, []);
 
   const isSignUp = view === 'signup';
 
@@ -119,8 +134,9 @@ export default function Auth() {
 
     setLoading(true);
     try {
+      const redirectUrl = `${window.location.origin}/auth/reset`;
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/auth/reset`,
+        redirectTo: redirectUrl,
       });
 
       if (error) {
@@ -134,6 +150,55 @@ export default function Auth() {
           title: 'Check your email',
           description: 'We sent you a password reset link. Please check your inbox.',
         });
+        setView('signin');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSetNewPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrors({});
+
+    // Validate new password
+    if (!newPassword) {
+      setErrors({ newPassword: 'Please enter a new password' });
+      return;
+    }
+
+    if (!passwordRegex.test(newPassword)) {
+      setErrors({ newPassword: 'Password must have 1 uppercase, 1 lowercase, 1 digit, and 1 symbol' });
+      return;
+    }
+
+    if (newPassword !== confirmNewPassword) {
+      setErrors({ confirmNewPassword: "Passwords don't match" });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const { error } = await supabase.auth.updateUser({
+        password: newPassword,
+      });
+
+      if (error) {
+        toast({
+          title: 'Password update failed',
+          description: error.message,
+          variant: 'destructive',
+        });
+      } else {
+        toast({
+          title: 'Password updated!',
+          description: 'Your password has been reset successfully. You can now sign in.',
+        });
+        setIsRecoverySession(false);
+        setNewPassword('');
+        setConfirmNewPassword('');
+        // Clear the hash from URL
+        window.history.replaceState(null, '', window.location.pathname);
         setView('signin');
       }
     } finally {
@@ -261,6 +326,71 @@ export default function Auth() {
           Back to sign in
         </button>
       </div>
+    </>
+  );
+
+  const renderSetNewPassword = () => (
+    <>
+      <div className="text-center mb-8">
+        <div className="inline-flex items-center gap-2 mb-4">
+          <Terminal className="h-8 w-8 text-primary" />
+          <span className="font-bold text-xl">
+            <span className="text-primary">JC</span> AlgoArena
+          </span>
+        </div>
+        <h1 className="text-2xl font-bold">Set new password</h1>
+        <p className="text-muted-foreground mt-2">
+          Enter your new password below
+        </p>
+      </div>
+
+      <form onSubmit={handleSetNewPassword} className="space-y-4">
+        <div className="space-y-2">
+          <Label htmlFor="new-password">New Password</Label>
+          <div className="relative">
+            <Input
+              id="new-password"
+              type={showPassword ? 'text' : 'password'}
+              placeholder="••••••••"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              className={errors.newPassword ? 'border-destructive pr-10' : 'pr-10'}
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            >
+              {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Min 6 characters: 1 UPPERCASE + 1 lowercase + 1 digit + 1 symbol (!@#$%...)
+          </p>
+          {errors.newPassword && (
+            <p className="text-sm text-destructive">{errors.newPassword}</p>
+          )}
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="confirm-new-password">Confirm New Password</Label>
+          <Input
+            id="confirm-new-password"
+            type="password"
+            placeholder="••••••••"
+            value={confirmNewPassword}
+            onChange={(e) => setConfirmNewPassword(e.target.value)}
+            className={errors.confirmNewPassword ? 'border-destructive' : ''}
+          />
+          {errors.confirmNewPassword && (
+            <p className="text-sm text-destructive">{errors.confirmNewPassword}</p>
+          )}
+        </div>
+
+        <Button type="submit" className="w-full" disabled={loading}>
+          {loading ? 'Updating...' : 'Update Password'}
+        </Button>
+      </form>
     </>
   );
 
@@ -425,6 +555,7 @@ export default function Auth() {
 
         <div className="bg-card border border-border rounded-2xl p-8 shadow-xl">
           {view === 'forgot-password' && renderForgotPassword()}
+          {view === 'reset-password' && renderSetNewPassword()}
           {(view === 'signin' || view === 'signup') && renderMainAuth()}
         </div>
       </div>
