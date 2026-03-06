@@ -72,7 +72,8 @@ export default function Auth() {
   const isSignUp = view === 'signup';
 
   useEffect(() => {
-    if (user) {
+    // Don't redirect if user is in a password recovery session
+    if (user && !isRecoverySession && view !== 'reset-password') {
       const redirectUrl = sessionStorage.getItem('redirectAfterAuth');
       if (redirectUrl) {
         sessionStorage.removeItem('redirectAfterAuth');
@@ -81,7 +82,7 @@ export default function Auth() {
         navigate('/');
       }
     }
-  }, [user, navigate]);
+  }, [user, navigate, isRecoverySession, view]);
 
   const validateForm = () => {
     setErrors({});
