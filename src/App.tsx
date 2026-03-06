@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
@@ -21,6 +21,23 @@ import Certificate from "./pages/Certificate";
 
 const queryClient = new QueryClient();
 
+const RecoveryAwareIndex = () => {
+  const location = useLocation();
+  const hashParams = new URLSearchParams(location.hash.replace(/^#/, ""));
+  const queryParams = new URLSearchParams(location.search);
+
+  const hasRecoveryHash = hashParams.get("type") === "recovery" && !!hashParams.get("access_token");
+  const hasRecoveryQuery =
+    queryParams.get("type") === "recovery" &&
+    (!!queryParams.get("code") || !!queryParams.get("token_hash") || !!queryParams.get("access_token"));
+
+  if (hasRecoveryHash || hasRecoveryQuery) {
+    return <Navigate to={`/reset-password${location.search}${location.hash}`} replace />;
+  }
+
+  return <Index />;
+};
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
@@ -28,10 +45,11 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={<Index />} />
+          <Route path="/" element={<RecoveryAwareIndex />} />
           <Route path="/auth" element={<Auth />} />
           <Route path="/auth/signup" element={<Auth />} />
           <Route path="/auth/reset" element={<Auth />} />
+          <Route path="/reset-password" element={<Auth />} />
           <Route path="/contests" element={<Contests />} />
           <Route path="/contest/:id" element={<ContestDetail />} />
           <Route path="/quiz/:id" element={<ProtectedRoute><Quiz /></ProtectedRoute>} />

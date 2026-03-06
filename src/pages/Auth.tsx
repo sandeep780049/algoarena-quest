@@ -37,10 +37,13 @@ export default function Auth() {
   const location = useLocation();
   const [searchParams] = useSearchParams();
 
-  const initialModeFromPath = location.pathname === '/auth/signup' ? 'signup' : location.pathname === '/auth/reset' ? 'reset' : null;
+  const isResetPath = location.pathname === '/auth/reset' || location.pathname === '/reset-password';
+  const initialModeFromPath = location.pathname === '/auth/signup' ? 'signup' : isResetPath ? 'reset' : null;
   const initialMode = initialModeFromPath ?? searchParams.get('mode');
 
-  const [view, setView] = useState<AuthView>(initialMode === 'signup' ? 'signup' : initialMode === 'reset' ? 'forgot-password' : 'signin');
+  const [view, setView] = useState<AuthView>(
+    initialMode === 'signup' ? 'signup' : initialMode === 'reset' ? 'reset-password' : 'signin'
+  );
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -57,23 +60,41 @@ export default function Auth() {
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  // Check for recovery session from password reset email
+  // Handle recovery session from password reset email (supports both hash and query based flows)
   useEffect(() => {
-    const hashParams = new URLSearchParams(window.location.hash.substring(1));
-    const accessToken = hashParams.get('access_token');
-    const type = hashParams.get('type');
-    
-    if (accessToken && type === 'recovery') {
-      setIsRecoverySession(true);
+    const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+    const queryParams = new URLSearchParams(location.search);
+
+    const hasRecoveryInHash = hashParams.get('type') === 'recovery' && !!hashParams.get('access_token');
+    const hasRecoveryInQuery =
+      queryParams.get('type') === 'recovery' &&
+      (!!queryParams.get('code') || !!queryParams.get('token_hash') || !!queryParams.get('access_token'));
+
+    const shouldShowResetView =
+      hasRecoveryInHash ||
+      hasRecoveryInQuery ||
+      location.pathname === '/auth/reset' ||
+      location.pathname === '/reset-password' ||
+      queryParams.get('mode') === 'reset';
+
+    if (shouldShowResetView) {
+      setIsRecoverySession(hasRecoveryInHash || hasRecoveryInQuery);
       setView('reset-password');
     }
-  }, []);
+  }, [location.pathname, location.search]);
 
   const isSignUp = view === 'signup';
 
   useEffect(() => {
-    // Don't redirect if user is in a password recovery session
-    if (user && !isRecoverySession && view !== 'reset-password') {
+    const queryParams = new URLSearchParams(location.search);
+    const isResetRoute =
+      location.pathname === '/auth/reset' ||
+      location.pathname === '/reset-password' ||
+      queryParams.get('mode') === 'reset' ||
+      queryParams.get('type') === 'recovery';
+
+    // Don't redirect away while on reset-password route/view or recovery flow
+    if (user && !isRecoverySession && !isResetRoute && view !== 'reset-password') {
       const redirectUrl = sessionStorage.getItem('redirectAfterAuth');
       if (redirectUrl) {
         sessionStorage.removeItem('redirectAfterAuth');
@@ -82,7 +103,7 @@ export default function Auth() {
         navigate('/');
       }
     }
-  }, [user, navigate, isRecoverySession, view]);
+  }, [user, navigate, isRecoverySession, view, location.pathname, location.search]);
 
   const validateForm = () => {
     setErrors({});
@@ -135,7 +156,7 @@ export default function Auth() {
 
     setLoading(true);
     try {
-      const redirectUrl = `${window.location.origin}/auth/reset`;
+      const redirectUrl = `${window.location.origin}/reset-password`;
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: redirectUrl,
       });
