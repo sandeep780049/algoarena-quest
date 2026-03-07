@@ -242,6 +242,129 @@ export type Database = {
         }
         Relationships: []
       }
+      gate_practice_answers: {
+        Row: {
+          id: string
+          is_correct: boolean
+          question_id: string
+          selected_answer: number
+          session_id: string
+          submitted_at: string
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          is_correct: boolean
+          question_id: string
+          selected_answer: number
+          session_id: string
+          submitted_at?: string
+          user_id: string
+        }
+        Update: {
+          id?: string
+          is_correct?: boolean
+          question_id?: string
+          selected_answer?: number
+          session_id?: string
+          submitted_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gate_practice_answers_question_id_fkey"
+            columns: ["question_id"]
+            isOneToOne: false
+            referencedRelation: "gate_questions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gate_practice_answers_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "gate_practice_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      gate_practice_sessions: {
+        Row: {
+          completed_at: string | null
+          correct_answers: number
+          created_at: string
+          id: string
+          subject: string
+          total_questions: number
+          user_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          correct_answers?: number
+          created_at?: string
+          id?: string
+          subject: string
+          total_questions?: number
+          user_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          correct_answers?: number
+          created_at?: string
+          id?: string
+          subject?: string
+          total_questions?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
+      gate_questions: {
+        Row: {
+          code_block: string | null
+          correct_answer: number
+          created_at: string
+          created_by: string | null
+          difficulty: string
+          explanation: string | null
+          id: string
+          options: Json
+          question_text: string
+          subject: string
+          tags: string[] | null
+          topic: string | null
+          updated_at: string
+        }
+        Insert: {
+          code_block?: string | null
+          correct_answer: number
+          created_at?: string
+          created_by?: string | null
+          difficulty?: string
+          explanation?: string | null
+          id?: string
+          options?: Json
+          question_text: string
+          subject: string
+          tags?: string[] | null
+          topic?: string | null
+          updated_at?: string
+        }
+        Update: {
+          code_block?: string | null
+          correct_answer?: number
+          created_at?: string
+          created_by?: string | null
+          difficulty?: string
+          explanation?: string | null
+          id?: string
+          options?: Json
+          question_text?: string
+          subject?: string
+          tags?: string[] | null
+          topic?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
