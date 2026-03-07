@@ -18,6 +18,9 @@ import Terms from "./pages/Terms";
 import About from "./pages/About";
 import Contact from "./pages/Contact";
 import Certificate from "./pages/Certificate";
+import GatePractice from "./pages/GatePractice";
+import GateSubjectPractice from "./pages/GateSubjectPractice";
+import GatePracticeSession from "./pages/GatePracticeSession";
 
 const queryClient = new QueryClient();
 
@@ -61,6 +64,9 @@ const App = () => (
           <Route path="/about" element={<About />} />
           <Route path="/contact" element={<Contact />} />
           <Route path="/certificate/:code" element={<Certificate />} />
+          <Route path="/gate-practice" element={<GatePractice />} />
+          <Route path="/gate-practice/:subjectId" element={<GateSubjectPractice />} />
+          <Route path="/gate-practice/session/:sessionId" element={<ProtectedRoute><GatePracticeSession /></ProtectedRoute>} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>

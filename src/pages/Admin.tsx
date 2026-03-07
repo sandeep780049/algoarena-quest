@@ -10,9 +10,22 @@ import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase';
 import type { Question, Contest } from '@/lib/supabase';
-import { Plus, Edit, Trash2, Save, X, Settings, Trophy, FileText, ChevronRight } from 'lucide-react';
+import { Plus, Edit, Trash2, Save, X, Settings, Trophy, FileText, ChevronRight, Upload, GraduationCap } from 'lucide-react';
 import { format } from 'date-fns';
 import { z } from 'zod';
+import { GATE_SUBJECTS } from '@/lib/gate-subjects';
+
+interface GateQuestion {
+  id: string;
+  subject: string;
+  topic: string | null;
+  difficulty: string;
+  question_text: string;
+  code_block: string | null;
+  options: string[];
+  correct_answer: number;
+  explanation: string | null;
+}
 
 // Validation schemas for admin forms
 const questionSchema = z.object({
@@ -37,14 +50,17 @@ export default function Admin() {
   const { user, isAdmin, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState<'questions' | 'contests'>('questions');
+  const [activeTab, setActiveTab] = useState<'questions' | 'contests' | 'gate'>('questions');
   const [questions, setQuestions] = useState<Question[]>([]);
   const [contests, setContests] = useState<Contest[]>([]);
+  const [gateQuestions, setGateQuestions] = useState<GateQuestion[]>([]);
   const [loading, setLoading] = useState(true);
   const [showQuestionForm, setShowQuestionForm] = useState(false);
   const [showContestForm, setShowContestForm] = useState(false);
+  const [showGateForm, setShowGateForm] = useState(false);
   const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
   const [editingContest, setEditingContest] = useState<Contest | null>(null);
+  const [editingGateQ, setEditingGateQ] = useState<GateQuestion | null>(null);
 
   // Question form state
   const [questionText, setQuestionText] = useState('');
@@ -62,6 +78,16 @@ export default function Admin() {
   const [duration, setDuration] = useState(30);
   const [selectedQuestions, setSelectedQuestions] = useState<string[]>([]);
 
+  // GATE question form state
+  const [gateSubject, setGateSubject] = useState(GATE_SUBJECTS[0].id);
+  const [gateTopic, setGateTopic] = useState('');
+  const [gateDifficulty, setGateDifficulty] = useState('medium');
+  const [gateQuestionText, setGateQuestionText] = useState('');
+  const [gateCodeBlock, setGateCodeBlock] = useState('');
+  const [gateOptions, setGateOptions] = useState(['', '', '', '']);
+  const [gateCorrectAnswer, setGateCorrectAnswer] = useState(0);
+  const [gateExplanation, setGateExplanation] = useState('');
+
   useEffect(() => {
     if (!authLoading && (!user || !isAdmin)) {
       navigate('/');
@@ -77,12 +103,14 @@ export default function Admin() {
 
   const fetchData = async () => {
     setLoading(true);
-    const [{ data: q }, { data: c }] = await Promise.all([
+    const [{ data: q }, { data: c }, { data: gq }] = await Promise.all([
       supabase.from('questions').select('*').order('created_at', { ascending: false }),
-      supabase.from('contests').select('*').order('created_at', { ascending: false })
+      supabase.from('contests').select('*').order('created_at', { ascending: false }),
+      supabase.from('gate_questions').select('*').order('created_at', { ascending: false }),
     ]);
     setQuestions((q as Question[]) || []);
     setContests((c as Contest[]) || []);
+    setGateQuestions((gq as GateQuestion[]) || []);
     setLoading(false);
   };
 
@@ -96,31 +124,21 @@ export default function Admin() {
     setStartTime(''); setDuration(30); setSelectedQuestions([]); setEditingContest(null); setShowContestForm(false);
   };
 
-  const saveQuestion = async () => {
-    // Validate with Zod schema
-    const validation = questionSchema.safeParse({
-      questionText,
-      codeBlock: codeBlock || undefined,
-      options,
-      correctAnswer,
-      explanation: explanation || undefined,
-    });
+  const resetGateForm = () => {
+    setGateSubject(GATE_SUBJECTS[0].id); setGateTopic(''); setGateDifficulty('medium');
+    setGateQuestionText(''); setGateCodeBlock(''); setGateOptions(['', '', '', '']);
+    setGateCorrectAnswer(0); setGateExplanation(''); setEditingGateQ(null); setShowGateForm(false);
+  };
 
+  const saveQuestion = async () => {
+    const validation = questionSchema.safeParse({
+      questionText, codeBlock: codeBlock || undefined, options, correctAnswer, explanation: explanation || undefined,
+    });
     if (!validation.success) {
-      const firstError = validation.error.errors[0];
-      toast({ title: 'Validation Error', description: firstError.message, variant: 'destructive' });
+      toast({ title: 'Validation Error', description: validation.error.errors[0].message, variant: 'destructive' });
       return;
     }
-
-    const data = { 
-      question_text: validation.data.questionText, 
-      code_block: validation.data.codeBlock || null, 
-      options: validation.data.options, 
-      correct_answer: validation.data.correctAnswer, 
-      explanation: validation.data.explanation || null, 
-      created_by: user?.id 
-    };
-    
+    const data = { question_text: validation.data.questionText, code_block: validation.data.codeBlock || null, options: validation.data.options, correct_answer: validation.data.correctAnswer, explanation: validation.data.explanation || null, created_by: user?.id };
     if (editingQuestion) {
       await supabase.from('questions').update(data).eq('id', editingQuestion.id);
     } else {
@@ -137,33 +155,15 @@ export default function Admin() {
   };
 
   const saveContest = async () => {
-    // Validate with Zod schema
     const validation = contestSchema.safeParse({
-      contestName,
-      contestDesc: contestDesc || undefined,
-      contestCode,
-      contestType,
-      startTime,
-      duration,
+      contestName, contestDesc: contestDesc || undefined, contestCode, contestType, startTime, duration,
       selectedQuestions: selectedQuestions.length > 0 ? selectedQuestions : undefined,
     });
-
     if (!validation.success) {
-      const firstError = validation.error.errors[0];
-      toast({ title: 'Validation Error', description: firstError.message, variant: 'destructive' });
+      toast({ title: 'Validation Error', description: validation.error.errors[0].message, variant: 'destructive' });
       return;
     }
-    
-    const contestData = { 
-      name: validation.data.contestName, 
-      description: validation.data.contestDesc || null, 
-      contest_type: validation.data.contestType, 
-      contest_code: validation.data.contestCode, 
-      start_time: new Date(validation.data.startTime).toISOString(), 
-      duration_minutes: validation.data.duration, 
-      created_by: user?.id 
-    };
-    
+    const contestData = { name: validation.data.contestName, description: validation.data.contestDesc || null, contest_type: validation.data.contestType, contest_code: validation.data.contestCode, start_time: new Date(validation.data.startTime).toISOString(), duration_minutes: validation.data.duration, created_by: user?.id };
     let contestId = editingContest?.id;
     if (editingContest) {
       await supabase.from('contests').update(contestData).eq('id', editingContest.id);
@@ -171,13 +171,11 @@ export default function Admin() {
       const { data } = await supabase.from('contests').insert(contestData).select().single();
       contestId = data?.id;
     }
-
     if (contestId && selectedQuestions.length > 0) {
       await supabase.from('contest_questions').delete().eq('contest_id', contestId);
       const cqData = selectedQuestions.map((qId, idx) => ({ contest_id: contestId, question_id: qId, order_index: idx }));
       await supabase.from('contest_questions').insert(cqData);
     }
-
     toast({ title: 'Success', description: 'Contest saved.' });
     resetContestForm(); fetchData();
   };
@@ -206,6 +204,100 @@ export default function Admin() {
     setShowContestForm(true);
   };
 
+  // GATE question CRUD
+  const saveGateQuestion = async () => {
+    if (!gateQuestionText.trim() || gateOptions.some(o => !o.trim())) {
+      toast({ title: 'Validation Error', description: 'Fill all required fields', variant: 'destructive' });
+      return;
+    }
+    const data = {
+      subject: gateSubject,
+      topic: gateTopic || null,
+      difficulty: gateDifficulty,
+      question_text: gateQuestionText,
+      code_block: gateCodeBlock || null,
+      options: gateOptions,
+      correct_answer: gateCorrectAnswer,
+      explanation: gateExplanation || null,
+      created_by: user?.id,
+    };
+    if (editingGateQ) {
+      await supabase.from('gate_questions').update(data).eq('id', editingGateQ.id);
+    } else {
+      await supabase.from('gate_questions').insert(data);
+    }
+    toast({ title: 'Success', description: 'GATE question saved.' });
+    resetGateForm(); fetchData();
+  };
+
+  const deleteGateQuestion = async (id: string) => {
+    if (!confirm('Delete this GATE question?')) return;
+    await supabase.from('gate_questions').delete().eq('id', id);
+    toast({ title: 'Deleted' }); fetchData();
+  };
+
+  const editGateQ = (q: GateQuestion) => {
+    setEditingGateQ(q); setGateSubject(q.subject); setGateTopic(q.topic || '');
+    setGateDifficulty(q.difficulty); setGateQuestionText(q.question_text);
+    setGateCodeBlock(q.code_block || ''); setGateOptions(q.options as string[]);
+    setGateCorrectAnswer(q.correct_answer); setGateExplanation(q.explanation || '');
+    setShowGateForm(true);
+  };
+
+  // CSV Bulk Upload
+  const handleCsvUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const text = await file.text();
+    const lines = text.split('\n').filter(l => l.trim());
+    if (lines.length < 2) {
+      toast({ title: 'Error', description: 'CSV must have a header and at least one row', variant: 'destructive' });
+      return;
+    }
+
+    const header = lines[0].toLowerCase();
+    const rows = lines.slice(1);
+    let count = 0;
+
+    for (const row of rows) {
+      try {
+        // Simple CSV parse (handles basic cases)
+        const cols = row.split(',').map(c => c.trim().replace(/^"|"$/g, ''));
+        if (cols.length < 6) continue;
+
+        const [title, description, optionsStr, correct, expl, subject, difficulty] = cols;
+        const opts = optionsStr.split('|').map(o => o.trim());
+        if (opts.length < 2) continue;
+
+        const correctIdx = parseInt(correct);
+        if (isNaN(correctIdx) || correctIdx < 0 || correctIdx >= opts.length) continue;
+
+        const subjectId = GATE_SUBJECTS.find(s =>
+          s.id === subject || s.name.toLowerCase() === subject.toLowerCase() || s.shortName.toLowerCase() === subject.toLowerCase()
+        )?.id || 'algorithms';
+
+        await supabase.from('gate_questions').insert({
+          question_text: title || description,
+          code_block: description !== title ? description : null,
+          options: opts,
+          correct_answer: correctIdx,
+          explanation: expl || null,
+          subject: subjectId,
+          difficulty: ['easy', 'medium', 'hard'].includes(difficulty?.toLowerCase()) ? difficulty.toLowerCase() : 'medium',
+          created_by: user?.id,
+        });
+        count++;
+      } catch {
+        continue;
+      }
+    }
+
+    toast({ title: 'Import Complete', description: `${count} questions imported successfully.` });
+    fetchData();
+    e.target.value = '';
+  };
+
   if (authLoading || loading) return <Layout><div className="container mx-auto px-4 py-12"><div className="animate-pulse h-64 bg-secondary rounded-xl" /></div></Layout>;
 
   return (
@@ -213,15 +305,16 @@ export default function Admin() {
       <div className="container mx-auto px-4 py-12">
         <h1 className="text-3xl font-bold mb-8"><Settings className="inline h-8 w-8 mr-3 text-primary" />Admin Panel</h1>
 
-        <div className="flex gap-2 mb-8">
+        <div className="flex flex-wrap gap-2 mb-8">
           <Button variant={activeTab === 'questions' ? 'default' : 'outline'} onClick={() => setActiveTab('questions')}><FileText className="h-4 w-4 mr-2" />Questions ({questions.length})</Button>
           <Button variant={activeTab === 'contests' ? 'default' : 'outline'} onClick={() => setActiveTab('contests')}><Trophy className="h-4 w-4 mr-2" />Contests ({contests.length})</Button>
+          <Button variant={activeTab === 'gate' ? 'default' : 'outline'} onClick={() => setActiveTab('gate')}><GraduationCap className="h-4 w-4 mr-2" />GATE Questions ({gateQuestions.length})</Button>
         </div>
 
+        {/* QUESTIONS TAB */}
         {activeTab === 'questions' && (
           <div>
             <Button onClick={() => setShowQuestionForm(true)} className="mb-6"><Plus className="h-4 w-4 mr-2" />Add Question</Button>
-            
             {showQuestionForm && (
               <div className="bg-card border border-border rounded-xl p-6 mb-6">
                 <div className="flex justify-between mb-4"><h3 className="font-semibold">{editingQuestion ? 'Edit' : 'New'} Question</h3><Button variant="ghost" size="icon" onClick={resetQuestionForm}><X className="h-4 w-4" /></Button></div>
@@ -234,7 +327,6 @@ export default function Admin() {
                 </div>
               </div>
             )}
-
             <div className="space-y-4">{questions.map(q => (
               <div key={q.id} className="bg-card border border-border rounded-lg p-4 flex justify-between items-start">
                 <div className="flex-1"><p className="font-medium">{q.question_text}</p>{q.code_block && <pre className="text-sm text-muted-foreground mt-2 font-mono bg-secondary/50 p-2 rounded">{q.code_block.slice(0, 100)}...</pre>}</div>
@@ -244,10 +336,10 @@ export default function Admin() {
           </div>
         )}
 
+        {/* CONTESTS TAB */}
         {activeTab === 'contests' && (
           <div>
             <Button onClick={() => setShowContestForm(true)} className="mb-6"><Plus className="h-4 w-4 mr-2" />Create Contest</Button>
-            
             {showContestForm && (
               <div className="bg-card border border-border rounded-xl p-6 mb-6">
                 <div className="flex justify-between mb-4"><h3 className="font-semibold">{editingContest ? 'Edit' : 'New'} Contest</h3><Button variant="ghost" size="icon" onClick={resetContestForm}><X className="h-4 w-4" /></Button></div>
@@ -263,15 +355,104 @@ export default function Admin() {
                 <Button onClick={saveContest} className="mt-4"><Save className="h-4 w-4 mr-2" />Save Contest</Button>
               </div>
             )}
-
             <div className="space-y-4">{contests.map(c => (
               <div key={c.id} className="bg-card border border-border rounded-lg p-4">
                 <div className="flex justify-between items-start">
-                  <div><div className="flex items-center gap-2 mb-2"><h3 className="font-semibold">{c.name}</h3><Badge>{c.contest_type}</Badge>{c.is_published ? <Badge className="bg-glow-success/20 text-glow-success">Published</Badge> : <Badge variant="outline">Draft</Badge>}</div><p className="text-sm text-muted-foreground">{format(new Date(c.start_time), 'PPP p')} • {c.duration_minutes}min • Code: {c.contest_code}</p></div>
+                  <div><div className="flex items-center gap-2 mb-2"><h3 className="font-semibold">{c.name}</h3><Badge>{c.contest_type}</Badge>{c.is_published ? <Badge className="bg-green-500/20 text-green-400">Published</Badge> : <Badge variant="outline">Draft</Badge>}</div><p className="text-sm text-muted-foreground">{format(new Date(c.start_time), 'PPP p')} • {c.duration_minutes}min • Code: {c.contest_code}</p></div>
                   <div className="flex gap-2">{!c.is_published && <Button size="sm" onClick={() => publishContest(c)}>Publish</Button>}<Button variant="ghost" size="icon" onClick={() => editContest(c)}><Edit className="h-4 w-4" /></Button></div>
                 </div>
               </div>
             ))}</div>
+          </div>
+        )}
+
+        {/* GATE QUESTIONS TAB */}
+        {activeTab === 'gate' && (
+          <div>
+            <div className="flex flex-wrap gap-3 mb-6">
+              <Button onClick={() => setShowGateForm(true)}><Plus className="h-4 w-4 mr-2" />Add GATE Question</Button>
+              <label className="cursor-pointer">
+                <Button variant="outline" asChild>
+                  <span><Upload className="h-4 w-4 mr-2" />Bulk CSV Upload</span>
+                </Button>
+                <input type="file" accept=".csv" className="hidden" onChange={handleCsvUpload} />
+              </label>
+            </div>
+
+            <p className="text-xs text-muted-foreground mb-4">
+              CSV format: title, description, options (pipe-separated), correct_answer (0-indexed), explanation, subject, difficulty
+            </p>
+
+            {showGateForm && (
+              <div className="bg-card border border-border rounded-xl p-6 mb-6">
+                <div className="flex justify-between mb-4">
+                  <h3 className="font-semibold">{editingGateQ ? 'Edit' : 'New'} GATE Question</h3>
+                  <Button variant="ghost" size="icon" onClick={resetGateForm}><X className="h-4 w-4" /></Button>
+                </div>
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div>
+                    <Label>Subject *</Label>
+                    <select value={gateSubject} onChange={e => setGateSubject(e.target.value)} className="w-full h-10 rounded-lg border border-border bg-background px-3">
+                      {GATE_SUBJECTS.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                    </select>
+                  </div>
+                  <div><Label>Topic</Label><Input value={gateTopic} onChange={e => setGateTopic(e.target.value)} placeholder="e.g. Binary Trees" /></div>
+                  <div>
+                    <Label>Difficulty *</Label>
+                    <select value={gateDifficulty} onChange={e => setGateDifficulty(e.target.value)} className="w-full h-10 rounded-lg border border-border bg-background px-3">
+                      <option value="easy">Easy</option>
+                      <option value="medium">Medium</option>
+                      <option value="hard">Hard</option>
+                    </select>
+                  </div>
+                  <div className="md:col-span-2"><Label>Question Text *</Label><Textarea value={gateQuestionText} onChange={e => setGateQuestionText(e.target.value)} placeholder="What is the output of..." /></div>
+                  <div className="md:col-span-2"><Label>Code Block</Label><Textarea value={gateCodeBlock} onChange={e => setGateCodeBlock(e.target.value)} className="font-mono" placeholder="Code snippet..." /></div>
+                  <div className="md:col-span-2">
+                    <Label>Options * (select correct answer)</Label>
+                    {gateOptions.map((o, i) => (
+                      <div key={i} className="flex gap-2 mt-2">
+                        <input type="radio" checked={gateCorrectAnswer === i} onChange={() => setGateCorrectAnswer(i)} />
+                        <Input value={o} onChange={e => { const n = [...gateOptions]; n[i] = e.target.value; setGateOptions(n); }} placeholder={`Option ${i + 1}`} />
+                      </div>
+                    ))}
+                  </div>
+                  <div className="md:col-span-2"><Label>Explanation</Label><Textarea value={gateExplanation} onChange={e => setGateExplanation(e.target.value)} placeholder="Explain the answer..." /></div>
+                </div>
+                <Button onClick={saveGateQuestion} className="mt-4"><Save className="h-4 w-4 mr-2" />Save GATE Question</Button>
+              </div>
+            )}
+
+            {/* GATE Question List */}
+            <div className="space-y-4">
+              {gateQuestions.map(q => {
+                const subj = GATE_SUBJECTS.find(s => s.id === q.subject);
+                return (
+                  <div key={q.id} className="bg-card border border-border rounded-lg p-4 flex justify-between items-start">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <Badge variant="outline" className="text-xs">{subj?.shortName || q.subject}</Badge>
+                        <Badge variant="outline" className={`text-xs ${
+                          q.difficulty === 'easy' ? 'text-green-400 border-green-400/30' :
+                          q.difficulty === 'hard' ? 'text-red-400 border-red-400/30' :
+                          'text-yellow-400 border-yellow-400/30'
+                        }`}>{q.difficulty}</Badge>
+                        {q.topic && <Badge variant="outline" className="text-xs">{q.topic}</Badge>}
+                      </div>
+                      <p className="font-medium truncate">{q.question_text}</p>
+                    </div>
+                    <div className="flex gap-2 shrink-0">
+                      <Button variant="ghost" size="icon" onClick={() => editGateQ(q)}><Edit className="h-4 w-4" /></Button>
+                      <Button variant="ghost" size="icon" onClick={() => deleteGateQuestion(q.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                    </div>
+                  </div>
+                );
+              })}
+              {gateQuestions.length === 0 && (
+                <div className="text-center py-12 text-muted-foreground">
+                  No GATE questions yet. Add one above or use CSV bulk upload.
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>
