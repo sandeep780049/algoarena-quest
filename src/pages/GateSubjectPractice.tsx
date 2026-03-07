@@ -158,7 +158,7 @@ export default function GateSubjectPractice() {
 
   return (
     <Layout>
-      <SEO title={`${subject.name} - GATE Practice`} description={`Practice ${subject.name} questions for GATE CSE`} />
+      <SEO title={`${subject.name} - GATE Practice`} description={`Practice ${subject.name} questions for GATE CSE`} path={`/gate-practice/${subjectId}`} />
       <div className="container mx-auto px-4 py-12">
         {/* Back + Header */}
         <Button variant="ghost" onClick={() => navigate('/gate-practice')} className="mb-6">

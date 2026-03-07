@@ -151,7 +151,7 @@ export default function GatePracticeSession() {
   if (submitted) {
     return (
       <Layout>
-        <SEO title="Practice Results" description="Your practice session results" />
+        <SEO title="Practice Results" description="Your practice session results" path={`/gate-practice/session/${sessionId}`} />
         <div className="container mx-auto px-4 py-12 max-w-3xl">
           {/* Score Summary */}
           <div className="bg-card border border-border rounded-xl p-8 text-center mb-8">
@@ -248,7 +248,7 @@ export default function GatePracticeSession() {
   // Quiz view
   return (
     <Layout>
-      <SEO title="GATE Practice Session" description="Solve GATE practice questions" />
+      <SEO title="GATE Practice Session" description="Solve GATE practice questions" path={`/gate-practice/session/${sessionId}`} />
       <div className="container mx-auto px-4 py-8 max-w-3xl">
         {/* Progress Bar */}
         <div className="mb-6">

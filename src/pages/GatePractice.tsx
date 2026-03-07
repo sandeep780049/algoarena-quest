@@ -80,7 +80,7 @@ export default function GatePractice() {
 
   return (
     <Layout>
-      <SEO title="GATE Practice - JC AlgoArena" description="Practice subject-wise GATE CSE questions" />
+      <SEO title="GATE Practice - JC AlgoArena" description="Practice subject-wise GATE CSE questions" path="/gate-practice" />
       <div className="container mx-auto px-4 py-12">
         {/* Hero */}
         <div className="text-center mb-12">
