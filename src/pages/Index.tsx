@@ -273,11 +273,11 @@ export default function Index() {
   ];
 
   const gateFeatures = [
-    { icon: BookOpen, title: 'Subject-Wise Practice', description: 'Practice GATE questions organized by subject and topic for focused preparation.' },
-    { icon: Timer, title: 'Mock GATE Contests', description: 'Participate in timed contests that simulate the real GATE exam experience.' },
-    { icon: BarChart3, title: 'Leaderboard Rankings', description: 'Compare your performance with other students and track your standing.' },
-    { icon: TrendingUp, title: 'Progress Tracking', description: 'Track solved questions, accuracy, and improvement over time.' },
-    { icon: Award, title: 'Certificates', description: 'Earn certificates of achievement after completing GATE contests.' },
+    { icon: BookOpen, title: 'Subject-Wise Practice', description: 'Practice GATE questions organized by subject and topic for focused preparation.', link: '/gate-practice' },
+    { icon: Timer, title: 'Mock GATE Contests', description: 'Participate in timed contests that simulate the real GATE exam experience.', link: '/contests' },
+    { icon: BarChart3, title: 'Leaderboard Rankings', description: 'Compare your performance with other students and track your standing.', link: '/leaderboard' },
+    { icon: TrendingUp, title: 'Progress Tracking', description: 'Track solved questions, accuracy, and improvement over time.', link: user ? '/profile' : '/auth/signup' },
+    { icon: Award, title: 'Certificates', description: 'Earn certificates of achievement after completing GATE contests.', link: '/contests' },
   ];
 
   const navTabs: { id: NavTab; label: string; icon: React.ElementType }[] = [
