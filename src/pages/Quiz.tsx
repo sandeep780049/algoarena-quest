@@ -69,6 +69,7 @@ export default function Quiz() {
   const [quizResult, setQuizResult] = useState<QuizResult | null>(null);
   const [hasCompleted, setHasCompleted] = useState(false);
   const [showEarlySubmitDialog, setShowEarlySubmitDialog] = useState(false);
+  const [isGateContest, setIsGateContest] = useState(false);
   
   // Prevent double submission
   const isSubmittingRef = useRef(false);
