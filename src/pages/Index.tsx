@@ -578,8 +578,8 @@ export default function Index() {
           </div>
 
           {/* Glowing feature card */}
-          <div className="max-w-3xl mx-auto mb-10">
-            <div className="relative group p-8 rounded-2xl bg-card border border-border hover:border-primary/40 transition-all duration-500">
+          <Link to="/contests" className="block max-w-3xl mx-auto mb-10">
+            <div className="relative group p-8 rounded-2xl bg-card border border-border hover:border-primary/40 transition-all duration-500 hover:scale-[1.02]">
               <div className="absolute -inset-px rounded-2xl bg-gradient-to-r from-primary/20 via-accent/10 to-primary/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500 blur-sm" />
               <div className="relative flex flex-col md:flex-row items-center gap-6">
                 <div className="w-16 h-16 rounded-xl bg-primary/10 flex items-center justify-center shrink-0 group-hover:shadow-[0_0_20px_hsl(var(--primary)/0.3)] transition-shadow duration-500">
@@ -591,10 +591,13 @@ export default function Index() {
                     Sharpen your programming logic by predicting outputs of tricky code snippets. 
                     Compete in daily and weekly contests, climb the leaderboard, and earn certificates.
                   </p>
+                  <span className="mt-2 inline-flex items-center text-sm font-medium text-primary opacity-0 group-hover:opacity-100 transition-opacity">
+                    Browse Contests <ChevronRight className="h-4 w-4 ml-1" />
+                  </span>
                 </div>
               </div>
             </div>
-          </div>
+          </Link>
 
           {/* Contest cards for non-gate contests */}
           {(dailyContests.length > 0 || weeklyContests.length > 0) && (
