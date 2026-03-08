@@ -133,9 +133,12 @@ export default function GateSubjectPractice() {
       return;
     }
 
-    // Pick random 10 questions (or fewer if not enough)
-    const shuffled = availableQs.sort(() => Math.random() - 0.5);
-    const selectedIds = shuffled.slice(0, 10).map(q => q.id);
+    // Pick random 10 unsolved questions first, then fill with solved if needed
+    const unsolved = availableQs.filter(q => !solvedIds.has(q.id));
+    const solved = availableQs.filter(q => solvedIds.has(q.id));
+    const shuffledUnsolved = unsolved.sort(() => Math.random() - 0.5);
+    const shuffledSolved = solved.sort(() => Math.random() - 0.5);
+    const selectedIds = [...shuffledUnsolved, ...shuffledSolved].slice(0, 10).map(q => q.id);
 
     // Create session
     const { data: session, error } = await supabase
