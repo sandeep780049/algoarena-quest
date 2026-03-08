@@ -50,7 +50,7 @@ export default function Admin() {
   const { user, isAdmin, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState<'questions' | 'contests' | 'gate'>('questions');
+  const [activeTab, setActiveTab] = useState<'questions' | 'contests' | 'gate' | 'gate-contests'>('questions');
   const [questions, setQuestions] = useState<Question[]>([]);
   const [contests, setContests] = useState<Contest[]>([]);
   const [gateQuestions, setGateQuestions] = useState<GateQuestion[]>([]);
