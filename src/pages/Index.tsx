@@ -273,11 +273,11 @@ export default function Index() {
   ];
 
   const gateFeatures = [
-    { icon: BookOpen, title: 'Subject-Wise Practice', description: 'Practice GATE questions organized by subject and topic for focused preparation.' },
-    { icon: Timer, title: 'Mock GATE Contests', description: 'Participate in timed contests that simulate the real GATE exam experience.' },
-    { icon: BarChart3, title: 'Leaderboard Rankings', description: 'Compare your performance with other students and track your standing.' },
-    { icon: TrendingUp, title: 'Progress Tracking', description: 'Track solved questions, accuracy, and improvement over time.' },
-    { icon: Award, title: 'Certificates', description: 'Earn certificates of achievement after completing GATE contests.' },
+    { icon: BookOpen, title: 'Subject-Wise Practice', description: 'Practice GATE questions organized by subject and topic for focused preparation.', link: '/gate-practice' },
+    { icon: Timer, title: 'Mock GATE Contests', description: 'Participate in timed contests that simulate the real GATE exam experience.', link: '/contests' },
+    { icon: BarChart3, title: 'Leaderboard Rankings', description: 'Compare your performance with other students and track your standing.', link: '/leaderboard' },
+    { icon: TrendingUp, title: 'Progress Tracking', description: 'Track solved questions, accuracy, and improvement over time.', link: user ? '/profile' : '/auth/signup' },
+    { icon: Award, title: 'Certificates', description: 'Earn certificates of achievement after completing GATE contests.', link: '/contests' },
   ];
 
   const navTabs: { id: NavTab; label: string; icon: React.ElementType }[] = [
@@ -513,11 +513,11 @@ export default function Index() {
               ))}
             </div>
           ) : (
-            <div className="text-center py-10 rounded-xl bg-card border border-border">
+          <Link to="/contests" className="block text-center py-10 rounded-xl bg-card border border-border hover:border-primary/50 transition-all hover:scale-[1.01]">
               <GraduationCap className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
               <p className="text-muted-foreground">No active GATE contests right now.</p>
-              <Link to="/contests" className="text-primary hover:underline text-sm mt-1 inline-block">Browse all contests</Link>
-            </div>
+              <span className="text-primary text-sm mt-1 inline-block">Browse all contests →</span>
+            </Link>
           )}
         </div>
       </section>
@@ -536,9 +536,10 @@ export default function Index() {
 
           <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-5">
             {gateFeatures.map((feature) => (
-              <div
+              <Link
                 key={feature.title}
-                className="group relative p-6 rounded-xl bg-card border border-border hover:border-primary/50 transition-all duration-300"
+                to={feature.link}
+                className="group relative p-6 rounded-xl bg-card border border-border hover:border-primary/50 transition-all duration-300 hover:scale-[1.03]"
               >
                 <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity rounded-xl" />
                 <div className="relative">
@@ -547,8 +548,11 @@ export default function Index() {
                   </div>
                   <h3 className="font-semibold mb-2">{feature.title}</h3>
                   <p className="text-sm text-muted-foreground">{feature.description}</p>
+                  <div className="mt-3 flex items-center text-xs font-medium text-primary opacity-0 group-hover:opacity-100 transition-opacity">
+                    Explore <ChevronRight className="h-3 w-3 ml-1" />
+                  </div>
                 </div>
-              </div>
+              </Link>
             ))}
           </div>
         </div>
@@ -574,8 +578,8 @@ export default function Index() {
           </div>
 
           {/* Glowing feature card */}
-          <div className="max-w-3xl mx-auto mb-10">
-            <div className="relative group p-8 rounded-2xl bg-card border border-border hover:border-primary/40 transition-all duration-500">
+          <Link to="/contests" className="block max-w-3xl mx-auto mb-10">
+            <div className="relative group p-8 rounded-2xl bg-card border border-border hover:border-primary/40 transition-all duration-500 hover:scale-[1.02]">
               <div className="absolute -inset-px rounded-2xl bg-gradient-to-r from-primary/20 via-accent/10 to-primary/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500 blur-sm" />
               <div className="relative flex flex-col md:flex-row items-center gap-6">
                 <div className="w-16 h-16 rounded-xl bg-primary/10 flex items-center justify-center shrink-0 group-hover:shadow-[0_0_20px_hsl(var(--primary)/0.3)] transition-shadow duration-500">
@@ -587,10 +591,13 @@ export default function Index() {
                     Sharpen your programming logic by predicting outputs of tricky code snippets. 
                     Compete in daily and weekly contests, climb the leaderboard, and earn certificates.
                   </p>
+                  <span className="mt-2 inline-flex items-center text-sm font-medium text-primary opacity-0 group-hover:opacity-100 transition-opacity">
+                    Browse Contests <ChevronRight className="h-4 w-4 ml-1" />
+                  </span>
                 </div>
               </div>
             </div>
-          </div>
+          </Link>
 
           {/* Contest cards for non-gate contests */}
           {(dailyContests.length > 0 || weeklyContests.length > 0) && (
@@ -625,11 +632,11 @@ export default function Index() {
           )}
 
           {dailyContests.length === 0 && weeklyContests.length === 0 && !loading && (
-            <div className="text-center py-10 mb-10 rounded-xl bg-card border border-border">
+          <Link to="/contests" className="block text-center py-10 mb-10 rounded-xl bg-card border border-border hover:border-primary/50 transition-all hover:scale-[1.01]">
               <Braces className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
               <p className="text-muted-foreground">No active code output contests right now.</p>
-              <Link to="/contests" className="text-primary hover:underline text-sm mt-1 inline-block">Browse all contests</Link>
-            </div>
+              <span className="text-primary text-sm mt-1 inline-block">Browse all contests →</span>
+            </Link>
           )}
 
           <div className="text-center">
@@ -679,9 +686,10 @@ export default function Index() {
           </div>
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
             {features.map((feature) => (
-              <div
+              <Link
                 key={feature.title}
-                className="group relative p-6 rounded-xl bg-card border border-border hover:border-primary/50 transition-all duration-300"
+                to="/contests"
+                className="group relative p-6 rounded-xl bg-card border border-border hover:border-primary/50 transition-all duration-300 hover:scale-[1.03]"
               >
                 <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity rounded-xl" />
                 <div className="relative">
@@ -690,8 +698,11 @@ export default function Index() {
                   </div>
                   <h3 className="font-semibold mb-2">{feature.title}</h3>
                   <p className="text-sm text-muted-foreground">{feature.description}</p>
+                  <div className="mt-3 flex items-center text-xs font-medium text-primary opacity-0 group-hover:opacity-100 transition-opacity">
+                    Explore <ChevronRight className="h-3 w-3 ml-1" />
+                  </div>
                 </div>
-              </div>
+              </Link>
             ))}
           </div>
         </div>
