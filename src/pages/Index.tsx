@@ -280,11 +280,11 @@ export default function Index() {
     { icon: Award, title: 'Certificates', description: 'Earn certificates of achievement after completing GATE contests.', link: '/contests' },
   ];
 
-  const navTabs: { id: NavTab; label: string; icon: React.ElementType }[] = [
-    { id: 'home', label: 'Home', icon: Home },
-    { id: 'gate-prep', label: 'GATE Prep', icon: GraduationCap },
-    { id: 'gate-contests', label: 'GATE Contests', icon: Trophy },
-    { id: 'code-output', label: 'Code Output', icon: Braces },
+  const navTabs: { id: NavTab; label: string; icon: React.ElementType; color: string; activeClass: string }[] = [
+    { id: 'home', label: 'Home', icon: Home, color: 'text-primary', activeClass: 'bg-primary/15 text-primary border-primary/40 shadow-[0_0_14px_hsl(var(--primary)/0.3)]' },
+    { id: 'gate-prep', label: 'GATE Prep', icon: GraduationCap, color: 'text-glow-success', activeClass: 'bg-glow-success/15 text-glow-success border-glow-success/40 shadow-[0_0_14px_hsl(160_84%_39%/0.3)]' },
+    { id: 'gate-contests', label: 'GATE Contests', icon: Trophy, color: 'text-glow-warning', activeClass: 'bg-glow-warning/15 text-glow-warning border-glow-warning/40 shadow-[0_0_14px_hsl(38_92%_50%/0.3)]' },
+    { id: 'code-output', label: 'Code Output Contests', icon: Braces, color: 'text-accent', activeClass: 'bg-accent/15 text-accent border-accent/40 shadow-[0_0_14px_hsl(var(--accent)/0.3)]' },
   ];
 
   return (
@@ -296,9 +296,9 @@ export default function Index() {
       />
 
       {/* Sticky Sub-Navigation */}
-      <nav className="sticky top-16 z-40 border-b border-border/50 bg-background/60 backdrop-blur-xl">
-        <div className="container mx-auto px-4">
-          <div className="flex flex-wrap items-center justify-center gap-1 py-1.5">
+      <nav className="sticky top-16 z-40 border-b border-border/50 bg-background/70 backdrop-blur-xl">
+        <div className="container mx-auto px-3">
+          <div className="flex flex-wrap items-center justify-center gap-1.5 py-2">
             {navTabs.map((tab) => {
               const isActive = activeTab === tab.id;
               const TabIcon = tab.icon;
@@ -306,17 +306,14 @@ export default function Index() {
                 <button
                   key={tab.id}
                   onClick={() => scrollTo(tab.id)}
-                  className={`relative flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all duration-300 ${
+                  className={`relative flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition-all duration-300 border cursor-pointer active:scale-95 ${
                     isActive
-                      ? 'bg-primary/15 text-primary shadow-[0_0_12px_hsl(var(--primary)/0.25)]'
-                      : 'text-muted-foreground hover:text-primary hover:bg-primary/5'
+                      ? tab.activeClass
+                      : `border-transparent text-muted-foreground hover:${tab.color} hover:bg-secondary/80 hover:border-border`
                   }`}
                 >
                   <TabIcon className={`h-3.5 w-3.5 transition-transform duration-300 ${isActive ? 'scale-110' : ''}`} />
                   {tab.label}
-                  {isActive && (
-                    <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-6 h-0.5 rounded-full bg-primary" />
-                  )}
                 </button>
               );
             })}
