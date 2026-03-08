@@ -51,6 +51,18 @@ export default function Admin() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<'questions' | 'contests' | 'gate' | 'gate-contests'>('questions');
+  // GATE contest form state
+  const [showGateContestForm, setShowGateContestForm] = useState(false);
+  const [editingGateContest, setEditingGateContest] = useState<Contest | null>(null);
+  const [gcName, setGcName] = useState('');
+  const [gcCode, setGcCode] = useState('');
+  const [gcSubject, setGcSubject] = useState('');
+  const [gcDuration, setGcDuration] = useState(30);
+  const [gcStartTime, setGcStartTime] = useState('');
+  const [gcDesc, setGcDesc] = useState('');
+  const [gcDifficulty, setGcDifficulty] = useState('medium');
+  const [gcSelectedQuestions, setGcSelectedQuestions] = useState<string[]>([]);
+  const [gcSubjectFilter, setGcSubjectFilter] = useState('');
   const [questions, setQuestions] = useState<Question[]>([]);
   const [contests, setContests] = useState<Contest[]>([]);
   const [gateQuestions, setGateQuestions] = useState<GateQuestion[]>([]);
@@ -129,6 +141,63 @@ export default function Admin() {
     setGateSubject(GATE_SUBJECTS[0].id); setGateTopic(''); setGateDifficulty('medium');
     setGateQuestionText(''); setGateCodeBlock(''); setGateOptions(['', '', '', '']);
     setGateCorrectAnswer(0); setGateExplanation(''); setEditingGateQ(null); setShowGateForm(false);
+  };
+
+  const resetGateContestForm = () => {
+    setGcName(''); setGcCode(''); setGcSubject(''); setGcDuration(30);
+    setGcStartTime(''); setGcDesc(''); setGcDifficulty('medium');
+    setGcSelectedQuestions([]); setGcSubjectFilter('');
+    setEditingGateContest(null); setShowGateContestForm(false);
+  };
+
+  const gateContests = contests.filter(c => c.contest_type === 'gate');
+  const nonGateContests = contests.filter(c => c.contest_type !== 'gate');
+
+  const filteredGateQuestionsForContest = gateQuestions.filter(q => {
+    if (gcSubjectFilter && q.subject !== gcSubjectFilter) return false;
+    return true;
+  });
+
+  const saveGateContest = async () => {
+    if (!gcName.trim() || !gcCode.trim() || !gcStartTime) {
+      toast({ title: 'Validation Error', description: 'Fill all required fields.', variant: 'destructive' });
+      return;
+    }
+    const contestData = {
+      name: gcName, description: gcDesc || null, contest_type: 'gate' as const,
+      contest_code: gcCode, start_time: new Date(gcStartTime).toISOString(),
+      duration_minutes: gcDuration, created_by: user?.id,
+    };
+    let contestId = editingGateContest?.id;
+    if (editingGateContest) {
+      await supabase.from('contests').update(contestData).eq('id', editingGateContest.id);
+    } else {
+      const { data } = await supabase.from('contests').insert(contestData).select().single();
+      contestId = data?.id;
+    }
+    if (contestId && gcSelectedQuestions.length > 0) {
+      await supabase.from('gate_contest_questions' as any).delete().eq('contest_id', contestId);
+      const gcqData = gcSelectedQuestions.map((qId, idx) => ({ contest_id: contestId, question_id: qId, order_index: idx }));
+      await supabase.from('gate_contest_questions' as any).insert(gcqData);
+    }
+    toast({ title: 'Success', description: 'GATE Contest saved.' });
+    resetGateContestForm(); fetchData();
+  };
+
+  const editGateContest = async (c: Contest) => {
+    setEditingGateContest(c); setGcName(c.name); setGcCode(c.contest_code);
+    setGcDuration(c.duration_minutes); setGcDesc(c.description || '');
+    setGcStartTime(format(new Date(c.start_time), "yyyy-MM-dd'T'HH:mm"));
+    const { data } = await supabase.from('gate_contest_questions' as any).select('question_id').eq('contest_id', c.id).order('order_index');
+    setGcSelectedQuestions((data as any)?.map((d: any) => d.question_id) || []);
+    setShowGateContestForm(true);
+  };
+
+  const deleteGateContest = async (id: string) => {
+    if (!confirm('Delete this GATE contest? This will also remove all linked questions.')) return;
+    await supabase.from('gate_contest_questions' as any).delete().eq('contest_id', id);
+    await supabase.from('contests').delete().eq('id', id);
+    toast({ title: 'Deleted' }); fetchData();
   };
 
   const saveQuestion = async () => {
@@ -322,8 +391,9 @@ export default function Admin() {
 
         <div className="flex flex-wrap gap-2 mb-8">
           <Button variant={activeTab === 'questions' ? 'default' : 'outline'} onClick={() => setActiveTab('questions')}><FileText className="h-4 w-4 mr-2" />Questions ({questions.length})</Button>
-          <Button variant={activeTab === 'contests' ? 'default' : 'outline'} onClick={() => setActiveTab('contests')}><Trophy className="h-4 w-4 mr-2" />Contests ({contests.length})</Button>
+          <Button variant={activeTab === 'contests' ? 'default' : 'outline'} onClick={() => setActiveTab('contests')}><Trophy className="h-4 w-4 mr-2" />Contests ({nonGateContests.length})</Button>
           <Button variant={activeTab === 'gate' ? 'default' : 'outline'} onClick={() => setActiveTab('gate')}><GraduationCap className="h-4 w-4 mr-2" />GATE Questions ({gateQuestions.length})</Button>
+          <Button variant={activeTab === 'gate-contests' ? 'default' : 'outline'} onClick={() => setActiveTab('gate-contests')}><Trophy className="h-4 w-4 mr-2" />GATE Contests ({gateContests.length})</Button>
         </div>
 
         {/* QUESTIONS TAB */}
@@ -361,7 +431,7 @@ export default function Admin() {
                 <div className="grid md:grid-cols-2 gap-4">
                   <div><Label>Name *</Label><Input value={contestName} onChange={e => setContestName(e.target.value)} /></div>
                   <div><Label>Code *</Label><Input value={contestCode} onChange={e => setContestCode(e.target.value)} placeholder="DAILY001" /></div>
-                  <div><Label>Type</Label><select value={contestType} onChange={e => setContestType(e.target.value as any)} className="w-full h-10 rounded-lg border border-border bg-background px-3"><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="special">Special</option><option value="gate">GATE</option></select></div>
+                  <div><Label>Type</Label><select value={contestType} onChange={e => setContestType(e.target.value as any)} className="w-full h-10 rounded-lg border border-border bg-background px-3"><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="special">Special</option></select></div>
                   <div><Label>Duration (min)</Label><Input type="number" value={duration} onChange={e => setDuration(Number(e.target.value))} /></div>
                   <div className="md:col-span-2"><Label>Start Time *</Label><Input type="datetime-local" value={startTime} onChange={e => setStartTime(e.target.value)} /></div>
                   <div className="md:col-span-2"><Label>Description</Label><Textarea value={contestDesc} onChange={e => setContestDesc(e.target.value)} /></div>
@@ -378,7 +448,7 @@ export default function Admin() {
                 <Button onClick={saveContest} className="mt-4"><Save className="h-4 w-4 mr-2" />Save Contest</Button>
               </div>
             )}
-            <div className="space-y-4">{contests.map(c => (
+            <div className="space-y-4">{nonGateContests.map(c => (
               <div key={c.id} className="bg-card border border-border rounded-lg p-4">
                 <div className="flex justify-between items-start">
                   <div><div className="flex items-center gap-2 mb-2"><h3 className="font-semibold">{c.name}</h3><Badge>{c.contest_type}</Badge>{c.is_published ? <Badge className="bg-green-500/20 text-green-400">Published</Badge> : <Badge variant="outline">Draft</Badge>}</div><p className="text-sm text-muted-foreground">{format(new Date(c.start_time), 'PPP p')} • {c.duration_minutes}min • Code: {c.contest_code}</p></div>
@@ -473,6 +543,101 @@ export default function Admin() {
               {gateQuestions.length === 0 && (
                 <div className="text-center py-12 text-muted-foreground">
                   No GATE questions yet. Add one above or use CSV bulk upload.
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* GATE CONTESTS TAB */}
+        {activeTab === 'gate-contests' && (
+          <div>
+            <Button onClick={() => setShowGateContestForm(true)} className="mb-6"><Plus className="h-4 w-4 mr-2" />Create GATE Contest</Button>
+
+            {showGateContestForm && (
+              <div className="bg-card border border-border rounded-xl p-6 mb-6">
+                <div className="flex justify-between mb-4">
+                  <h3 className="font-semibold text-lg">{editingGateContest ? 'Edit' : 'New'} GATE Contest</h3>
+                  <Button variant="ghost" size="icon" onClick={resetGateContestForm}><X className="h-4 w-4" /></Button>
+                </div>
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div><Label>Contest Name *</Label><Input value={gcName} onChange={e => setGcName(e.target.value)} placeholder="GATE DS Weekly Challenge" /></div>
+                  <div><Label>Contest Code *</Label><Input value={gcCode} onChange={e => setGcCode(e.target.value)} placeholder="GATE-DS-001" /></div>
+                  <div>
+                    <Label>Subject</Label>
+                    <select value={gcSubject} onChange={e => setGcSubject(e.target.value)} className="w-full h-10 rounded-lg border border-border bg-background px-3">
+                      <option value="">All Subjects (Mixed)</option>
+                      {GATE_SUBJECTS.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                    </select>
+                  </div>
+                  <div><Label>Duration (minutes) *</Label><Input type="number" value={gcDuration} onChange={e => setGcDuration(Number(e.target.value))} min={1} max={480} /></div>
+                  <div>
+                    <Label>Difficulty Level</Label>
+                    <select value={gcDifficulty} onChange={e => setGcDifficulty(e.target.value)} className="w-full h-10 rounded-lg border border-border bg-background px-3">
+                      <option value="easy">Easy</option>
+                      <option value="medium">Medium</option>
+                      <option value="hard">Hard</option>
+                      <option value="mixed">Mixed</option>
+                    </select>
+                  </div>
+                  <div><Label>Start Time *</Label><Input type="datetime-local" value={gcStartTime} onChange={e => setGcStartTime(e.target.value)} /></div>
+                  <div className="md:col-span-2"><Label>Description</Label><Textarea value={gcDesc} onChange={e => setGcDesc(e.target.value)} placeholder="Describe the GATE contest..." /></div>
+
+                  {/* Question selector with subject filter */}
+                  <div className="md:col-span-2">
+                    <div className="flex items-center justify-between mb-2">
+                      <Label>Attach GATE Questions ({gcSelectedQuestions.length} selected)</Label>
+                      <select value={gcSubjectFilter} onChange={e => setGcSubjectFilter(e.target.value)} className="h-8 rounded-md border border-border bg-background px-2 text-xs">
+                        <option value="">All Subjects</option>
+                        {GATE_SUBJECTS.map(s => <option key={s.id} value={s.id}>{s.shortName}</option>)}
+                      </select>
+                    </div>
+                    <div className="max-h-64 overflow-y-auto border border-border rounded-lg p-2 space-y-1">
+                      {filteredGateQuestionsForContest.length === 0 && (
+                        <p className="text-sm text-muted-foreground text-center py-4">No questions found for selected filter.</p>
+                      )}
+                      {filteredGateQuestionsForContest.map(q => {
+                        const subj = GATE_SUBJECTS.find(s => s.id === q.subject);
+                        return (
+                          <label key={q.id} className="flex items-center gap-2 p-2 rounded hover:bg-secondary cursor-pointer">
+                            <input type="checkbox" checked={gcSelectedQuestions.includes(q.id)} onChange={e => setGcSelectedQuestions(e.target.checked ? [...gcSelectedQuestions, q.id] : gcSelectedQuestions.filter(id => id !== q.id))} />
+                            <Badge variant="outline" className="text-xs shrink-0">{subj?.shortName || q.subject}</Badge>
+                            <Badge variant="outline" className={`text-xs shrink-0 ${q.difficulty === 'easy' ? 'text-green-400 border-green-400/30' : q.difficulty === 'hard' ? 'text-red-400 border-red-400/30' : 'text-yellow-400 border-yellow-400/30'}`}>{q.difficulty}</Badge>
+                            <span className="text-sm truncate">{q.question_text}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+                <Button onClick={saveGateContest} className="mt-4"><Save className="h-4 w-4 mr-2" />Save GATE Contest</Button>
+              </div>
+            )}
+
+            {/* GATE Contest List */}
+            <div className="space-y-4">
+              {gateContests.map(c => (
+                <div key={c.id} className="bg-card border border-border rounded-lg p-4">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <div className="flex items-center gap-2 mb-2">
+                        <h3 className="font-semibold">{c.name}</h3>
+                        <Badge className="bg-primary/20 text-primary">GATE</Badge>
+                        {c.is_published ? <Badge className="bg-green-500/20 text-green-400">Published</Badge> : <Badge variant="outline">Draft</Badge>}
+                      </div>
+                      <p className="text-sm text-muted-foreground">{format(new Date(c.start_time), 'PPP p')} • {c.duration_minutes}min • Code: {c.contest_code}</p>
+                    </div>
+                    <div className="flex gap-2">
+                      {!c.is_published && <Button size="sm" onClick={() => publishContest(c)}>Publish</Button>}
+                      <Button variant="ghost" size="icon" onClick={() => editGateContest(c)}><Edit className="h-4 w-4" /></Button>
+                      <Button variant="ghost" size="icon" onClick={() => deleteGateContest(c.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+              {gateContests.length === 0 && (
+                <div className="text-center py-12 text-muted-foreground">
+                  No GATE contests yet. Create one above.
                 </div>
               )}
             </div>
