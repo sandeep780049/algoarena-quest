@@ -163,7 +163,8 @@ export default function Quiz() {
 
       const contestTyped = contestData as Contest;
       setContest(contestTyped);
-
+      const isGate = contestTyped.contest_type === 'gate';
+      setIsGateContest(isGate);
       // Calculate actual contest status based on time (don't rely on stored status)
       // Keep frontend aligned with backend rules (includes 1-minute grace period after end).
       const startTime = new Date(contestTyped.start_time);
