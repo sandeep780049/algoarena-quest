@@ -40,7 +40,7 @@ const contestSchema = z.object({
   contestName: z.string().trim().min(1, "Contest name is required").max(200, "Contest name must be under 200 characters"),
   contestDesc: z.string().max(1000, "Description must be under 1000 characters").optional(),
   contestCode: z.string().trim().min(1, "Contest code is required").max(50, "Contest code must be under 50 characters").regex(/^[A-Za-z0-9_-]+$/, "Contest code can only contain letters, numbers, hyphens, and underscores"),
-  contestType: z.enum(['daily', 'weekly', 'special']),
+  contestType: z.enum(['daily', 'weekly', 'special', 'gate']),
   startTime: z.string().min(1, "Start time is required"),
   duration: z.number().min(1, "Duration must be at least 1 minute").max(480, "Duration cannot exceed 8 hours"),
   selectedQuestions: z.array(z.string().uuid()).optional(),
