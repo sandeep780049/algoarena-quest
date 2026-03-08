@@ -122,7 +122,7 @@ export default function Admin() {
 
   const resetContestForm = () => {
     setContestName(''); setContestDesc(''); setContestType('daily'); setContestCode('');
-    setStartTime(''); setDuration(30); setSelectedQuestions([]); setEditingContest(null); setShowContestForm(false);
+    setStartTime(''); setDuration(30); setSelectedQuestions([]); setSelectedGateQuestions([]); setEditingContest(null); setShowContestForm(false);
   };
 
   const resetGateForm = () => {
