@@ -323,33 +323,21 @@ export default function Quiz() {
     setSubmitting(true);
 
     try {
-      // Retry once on transient/network failures
       let responseData: unknown = null;
       let lastError: unknown = null;
+      const rpcName = isGateContest ? 'submit_gate_quiz_answers' : 'submit_quiz_answers';
 
       for (let attempt = 0; attempt < 2; attempt++) {
-        const { data, error } = await supabase.rpc('submit_quiz_answers', {
+        const { data, error } = await supabase.rpc(rpcName as any, {
           p_contest_id: contest.id,
           p_answers: answers,
           p_started_at: startedAt?.toISOString() || new Date().toISOString(),
         });
 
-        if (!error) {
-          responseData = data;
-          lastError = null;
-          break;
-        }
-
+        if (!error) { responseData = data; lastError = null; break; }
         lastError = error;
         const msg = (error as { message?: string })?.message || '';
-        const isTransient =
-          msg.includes('Failed to fetch') ||
-          msg.includes('NetworkError') ||
-          msg.includes('timeout') ||
-          msg.includes('502') ||
-          msg.includes('503') ||
-          msg.includes('504');
-
+        const isTransient = msg.includes('Failed to fetch') || msg.includes('NetworkError') || msg.includes('timeout') || msg.includes('502') || msg.includes('503') || msg.includes('504');
         if (!isTransient || attempt === 1) break;
         await new Promise((r) => setTimeout(r, 600));
       }
