@@ -242,6 +242,90 @@ export type Database = {
         }
         Relationships: []
       }
+      gate_contest_questions: {
+        Row: {
+          contest_id: string
+          created_at: string
+          id: string
+          order_index: number
+          question_id: string
+        }
+        Insert: {
+          contest_id: string
+          created_at?: string
+          id?: string
+          order_index?: number
+          question_id: string
+        }
+        Update: {
+          contest_id?: string
+          created_at?: string
+          id?: string
+          order_index?: number
+          question_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gate_contest_questions_contest_id_fkey"
+            columns: ["contest_id"]
+            isOneToOne: false
+            referencedRelation: "contests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gate_contest_questions_question_id_fkey"
+            columns: ["question_id"]
+            isOneToOne: false
+            referencedRelation: "gate_questions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      gate_contest_submissions: {
+        Row: {
+          contest_id: string
+          id: string
+          is_correct: boolean
+          question_id: string
+          selected_answer: number
+          submitted_at: string
+          user_id: string
+        }
+        Insert: {
+          contest_id: string
+          id?: string
+          is_correct: boolean
+          question_id: string
+          selected_answer: number
+          submitted_at?: string
+          user_id: string
+        }
+        Update: {
+          contest_id?: string
+          id?: string
+          is_correct?: boolean
+          question_id?: string
+          selected_answer?: number
+          submitted_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gate_contest_submissions_contest_id_fkey"
+            columns: ["contest_id"]
+            isOneToOne: false
+            referencedRelation: "contests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gate_contest_submissions_question_id_fkey"
+            columns: ["question_id"]
+            isOneToOne: false
+            referencedRelation: "gate_questions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       gate_practice_answers: {
         Row: {
           id: string
@@ -588,6 +672,19 @@ export type Database = {
         Args: { p_contest_id: string }
         Returns: number
       }
+      get_gate_contest_questions: {
+        Args: { p_contest_id: string }
+        Returns: {
+          code_block: string
+          difficulty: string
+          id: string
+          options: Json
+          question_text: string
+          subject: string
+          tags: string[]
+          topic: string
+        }[]
+      }
       get_global_leaderboard: {
         Args: never
         Returns: {
@@ -621,12 +718,24 @@ export type Database = {
       }
       is_admin: { Args: never; Returns: boolean }
       is_user_registered: { Args: { p_contest_id: string }; Returns: boolean }
+      save_gate_quiz_answer: {
+        Args: {
+          p_contest_id: string
+          p_question_id: string
+          p_selected_answer: number
+        }
+        Returns: Json
+      }
       save_quiz_answer: {
         Args: {
           p_contest_id: string
           p_question_id: string
           p_selected_answer: number
         }
+        Returns: Json
+      }
+      submit_gate_quiz_answers: {
+        Args: { p_answers: Json; p_contest_id: string; p_started_at: string }
         Returns: Json
       }
       submit_quiz_answers: {
@@ -637,7 +746,7 @@ export type Database = {
     Enums: {
       app_role: "admin" | "user"
       contest_status: "upcoming" | "live" | "ended"
-      contest_type: "daily" | "weekly" | "special"
+      contest_type: "daily" | "weekly" | "special" | "gate"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -767,7 +876,7 @@ export const Constants = {
     Enums: {
       app_role: ["admin", "user"],
       contest_status: ["upcoming", "live", "ended"],
-      contest_type: ["daily", "weekly", "special"],
+      contest_type: ["daily", "weekly", "special", "gate"],
     },
   },
 } as const
