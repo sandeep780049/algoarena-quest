@@ -284,7 +284,7 @@ export default function Index() {
     { id: 'home', label: 'Home', icon: Home },
     { id: 'gate-prep', label: 'GATE Prep', icon: GraduationCap },
     { id: 'gate-contests', label: 'GATE Contests', icon: Trophy },
-    { id: 'code-output', label: 'Code Output Contests', icon: Braces },
+    { id: 'code-output', label: 'Code Output', icon: Braces },
   ];
 
   return (
