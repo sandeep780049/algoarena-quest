@@ -298,7 +298,7 @@ export default function Index() {
       {/* Sticky Sub-Navigation */}
       <nav className="sticky top-16 z-40 border-b border-border/50 bg-background/60 backdrop-blur-xl">
         <div className="container mx-auto px-4">
-          <div className="flex items-center gap-1 py-2 overflow-x-auto scrollbar-thin scrollbar-thumb-border no-scrollbar">
+          <div className="flex flex-wrap items-center justify-center gap-1 py-1.5">
             {navTabs.map((tab) => {
               const isActive = activeTab === tab.id;
               const TabIcon = tab.icon;
@@ -306,16 +306,16 @@ export default function Index() {
                 <button
                   key={tab.id}
                   onClick={() => scrollTo(tab.id)}
-                  className={`relative flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-medium whitespace-nowrap transition-all duration-300 shrink-0 ${
+                  className={`relative flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all duration-300 ${
                     isActive
-                      ? 'bg-primary/15 text-primary shadow-[0_0_15px_hsl(var(--primary)/0.3)]'
+                      ? 'bg-primary/15 text-primary shadow-[0_0_12px_hsl(var(--primary)/0.25)]'
                       : 'text-muted-foreground hover:text-primary hover:bg-primary/5'
                   }`}
                 >
-                  <TabIcon className={`h-4 w-4 transition-transform duration-300 ${isActive ? 'scale-110' : ''}`} />
+                  <TabIcon className={`h-3.5 w-3.5 transition-transform duration-300 ${isActive ? 'scale-110' : ''}`} />
                   {tab.label}
                   {isActive && (
-                    <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-8 h-0.5 rounded-full bg-primary" />
+                    <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-6 h-0.5 rounded-full bg-primary" />
                   )}
                 </button>
               );
