@@ -279,25 +279,15 @@ export default function Quiz() {
 
   const saveAnswer = async (questionId: string, answerIndex: number | null) => {
     if (!user || !contest) return;
-
-    // Validate answer index is within valid range (0-3 for 4 options) or null for deselect
-    if (answerIndex !== null && (answerIndex < 0 || answerIndex > 3)) {
-      console.error('Invalid answer index:', answerIndex);
-      return;
-    }
+    if (answerIndex !== null && (answerIndex < 0 || answerIndex > 3)) return;
 
     try {
-      const { data, error } = await supabase.rpc('save_quiz_answer', {
+      const rpcName = isGateContest ? 'save_gate_quiz_answer' : 'save_quiz_answer';
+      await supabase.rpc(rpcName as any, {
         p_contest_id: contest.id,
         p_question_id: questionId,
-        p_selected_answer: answerIndex ?? -1 // Use -1 to signal deletion
+        p_selected_answer: answerIndex ?? -1
       });
-      
-      if (error) {
-        console.error('Error saving answer:', error);
-        // Don't show toast for save errors - it's auto-save
-        // The submission will handle the actual scoring
-      }
     } catch (error) {
       console.error('Error saving answer:', error);
     }
