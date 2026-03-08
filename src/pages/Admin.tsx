@@ -51,6 +51,18 @@ export default function Admin() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<'questions' | 'contests' | 'gate' | 'gate-contests'>('questions');
+  // GATE contest form state
+  const [showGateContestForm, setShowGateContestForm] = useState(false);
+  const [editingGateContest, setEditingGateContest] = useState<Contest | null>(null);
+  const [gcName, setGcName] = useState('');
+  const [gcCode, setGcCode] = useState('');
+  const [gcSubject, setGcSubject] = useState('');
+  const [gcDuration, setGcDuration] = useState(30);
+  const [gcStartTime, setGcStartTime] = useState('');
+  const [gcDesc, setGcDesc] = useState('');
+  const [gcDifficulty, setGcDifficulty] = useState('medium');
+  const [gcSelectedQuestions, setGcSelectedQuestions] = useState<string[]>([]);
+  const [gcSubjectFilter, setGcSubjectFilter] = useState('');
   const [questions, setQuestions] = useState<Question[]>([]);
   const [contests, setContests] = useState<Contest[]>([]);
   const [gateQuestions, setGateQuestions] = useState<GateQuestion[]>([]);
