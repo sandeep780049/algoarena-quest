@@ -67,6 +67,7 @@ const App = () => (
           <Route path="/certificate/:code" element={<Certificate />} />
           <Route path="/gate-practice" element={<GatePractice />} />
           <Route path="/gate-practice/:subjectId" element={<GateSubjectPractice />} />
+          <Route path="/gate-practice/:subjectId/:questionId" element={<GateQuestionView />} />
           <Route path="/gate-practice/session/:sessionId" element={<ProtectedRoute><GatePracticeSession /></ProtectedRoute>} />
           <Route path="*" element={<NotFound />} />
         </Routes>

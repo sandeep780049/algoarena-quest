@@ -48,6 +48,7 @@ export default function GateSubjectPractice() {
   const [loading, setLoading] = useState(true);
   const [difficultyFilter, setDifficultyFilter] = useState<string>('all');
   const [startingQuiz, setStartingQuiz] = useState(false);
+  const [solvedIds, setSolvedIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (!subjectId) return;
