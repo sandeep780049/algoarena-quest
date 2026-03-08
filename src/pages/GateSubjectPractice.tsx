@@ -16,6 +16,7 @@ import {
   Clock,
   BarChart3,
   Filter,
+  ArrowRight,
 } from 'lucide-react';
 
 interface GateQuestion {
