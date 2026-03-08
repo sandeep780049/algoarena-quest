@@ -186,7 +186,10 @@ export default function Admin() {
   };
 
   const publishContest = async (contest: Contest) => {
-    const { data: cq } = await supabase.from('contest_questions').select('id').eq('contest_id', contest.id);
+    const isGate = contest.contest_type === 'gate';
+    const { data: cq } = isGate
+      ? await supabase.from('gate_contest_questions' as any).select('id').eq('contest_id', contest.id)
+      : await supabase.from('contest_questions').select('id').eq('contest_id', contest.id);
     if (!cq || cq.length === 0) {
       toast({ title: 'Error', description: 'Cannot publish contest without questions!', variant: 'destructive' }); return;
     }
