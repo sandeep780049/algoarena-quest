@@ -362,7 +362,15 @@ export default function Admin() {
                   <div><Label>Duration (min)</Label><Input type="number" value={duration} onChange={e => setDuration(Number(e.target.value))} /></div>
                   <div className="md:col-span-2"><Label>Start Time *</Label><Input type="datetime-local" value={startTime} onChange={e => setStartTime(e.target.value)} /></div>
                   <div className="md:col-span-2"><Label>Description</Label><Textarea value={contestDesc} onChange={e => setContestDesc(e.target.value)} /></div>
-                  <div className="md:col-span-2"><Label>Questions ({selectedQuestions.length} selected)</Label><div className="max-h-48 overflow-y-auto border border-border rounded-lg p-2 space-y-2">{questions.map(q => (<label key={q.id} className="flex items-center gap-2 p-2 rounded hover:bg-secondary cursor-pointer"><input type="checkbox" checked={selectedQuestions.includes(q.id)} onChange={e => setSelectedQuestions(e.target.checked ? [...selectedQuestions, q.id] : selectedQuestions.filter(id => id !== q.id))} /><span className="text-sm truncate">{q.question_text}</span></label>))}</div></div>
+                  {contestType !== 'gate' && (
+                    <div className="md:col-span-2"><Label>Questions ({selectedQuestions.length} selected)</Label><div className="max-h-48 overflow-y-auto border border-border rounded-lg p-2 space-y-2">{questions.map(q => (<label key={q.id} className="flex items-center gap-2 p-2 rounded hover:bg-secondary cursor-pointer"><input type="checkbox" checked={selectedQuestions.includes(q.id)} onChange={e => setSelectedQuestions(e.target.checked ? [...selectedQuestions, q.id] : selectedQuestions.filter(id => id !== q.id))} /><span className="text-sm truncate">{q.question_text}</span></label>))}</div></div>
+                  )}
+                  {contestType === 'gate' && (
+                    <div className="md:col-span-2"><Label>GATE Questions ({selectedGateQuestions.length} selected)</Label><div className="max-h-48 overflow-y-auto border border-border rounded-lg p-2 space-y-2">{gateQuestions.map(q => {
+                      const subj = GATE_SUBJECTS.find(s => s.id === q.subject);
+                      return (<label key={q.id} className="flex items-center gap-2 p-2 rounded hover:bg-secondary cursor-pointer"><input type="checkbox" checked={selectedGateQuestions.includes(q.id)} onChange={e => setSelectedGateQuestions(e.target.checked ? [...selectedGateQuestions, q.id] : selectedGateQuestions.filter(id => id !== q.id))} /><Badge variant="outline" className="text-xs shrink-0">{subj?.shortName || q.subject}</Badge><span className="text-sm truncate">{q.question_text}</span></label>);
+                    })}</div></div>
+                  )}
                 </div>
                 <Button onClick={saveContest} className="mt-4"><Save className="h-4 w-4 mr-2" />Save Contest</Button>
               </div>
