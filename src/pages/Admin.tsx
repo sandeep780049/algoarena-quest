@@ -172,7 +172,11 @@ export default function Admin() {
       const { data } = await supabase.from('contests').insert(contestData).select().single();
       contestId = data?.id;
     }
-    if (contestId && selectedQuestions.length > 0) {
+    if (contestId && contestType === 'gate' && selectedGateQuestions.length > 0) {
+      await supabase.from('gate_contest_questions' as any).delete().eq('contest_id', contestId);
+      const gcqData = selectedGateQuestions.map((qId, idx) => ({ contest_id: contestId, question_id: qId, order_index: idx }));
+      await supabase.from('gate_contest_questions' as any).insert(gcqData);
+    } else if (contestId && selectedQuestions.length > 0) {
       await supabase.from('contest_questions').delete().eq('contest_id', contestId);
       const cqData = selectedQuestions.map((qId, idx) => ({ contest_id: contestId, question_id: qId, order_index: idx }));
       await supabase.from('contest_questions').insert(cqData);
