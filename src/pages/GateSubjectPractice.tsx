@@ -55,8 +55,16 @@ export default function GateSubjectPractice() {
     const s = getSubjectById(subjectId);
     if (!s) { navigate('/gate-practice'); return; }
     setSubject(s);
+    // Restore filter
+    const saved = localStorage.getItem(`gate-filter-${subjectId}`);
+    if (saved) setDifficultyFilter(saved);
     fetchData(subjectId);
   }, [subjectId]);
+
+  // Persist filter
+  useEffect(() => {
+    if (subjectId) localStorage.setItem(`gate-filter-${subjectId}`, difficultyFilter);
+  }, [difficultyFilter, subjectId]);
 
   const fetchData = async (sid: string) => {
     setLoading(true);
@@ -68,7 +76,28 @@ export default function GateSubjectPractice() {
 
     setQuestions((qs as GateQuestion[]) || []);
 
+    // Load solved from localStorage first (fast)
+    const localSolved: string[] = JSON.parse(localStorage.getItem(`gate-solved-${sid}`) || '[]');
+    const solvedSet = new Set(localSolved);
+
     if (user) {
+      // Also load from DB
+      const { data: answers } = await supabase
+        .from('gate_practice_answers')
+        .select('question_id')
+        .eq('user_id', user.id);
+
+      if (answers) {
+        const answeredQIds = [...new Set(answers.map(a => a.question_id))];
+        // Filter to only questions in this subject
+        const subjectQIds = new Set((qs || []).map((q: any) => q.id));
+        answeredQIds.forEach(id => {
+          if (subjectQIds.has(id)) solvedSet.add(id);
+        });
+        // Sync back to localStorage
+        localStorage.setItem(`gate-solved-${sid}`, JSON.stringify([...solvedSet]));
+      }
+
       const { data: sess } = await supabase
         .from('gate_practice_sessions')
         .select('*')
@@ -78,6 +107,8 @@ export default function GateSubjectPractice() {
         .limit(10);
       setSessions((sess as SessionHistory[]) || []);
     }
+
+    setSolvedIds(solvedSet);
     setLoading(false);
   };
 
