@@ -513,11 +513,11 @@ export default function Index() {
               ))}
             </div>
           ) : (
-            <div className="text-center py-10 rounded-xl bg-card border border-border">
+          <Link to="/contests" className="block text-center py-10 rounded-xl bg-card border border-border hover:border-primary/50 transition-all hover:scale-[1.01]">
               <GraduationCap className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
               <p className="text-muted-foreground">No active GATE contests right now.</p>
-              <Link to="/contests" className="text-primary hover:underline text-sm mt-1 inline-block">Browse all contests</Link>
-            </div>
+              <span className="text-primary text-sm mt-1 inline-block">Browse all contests →</span>
+            </Link>
           )}
         </div>
       </section>
