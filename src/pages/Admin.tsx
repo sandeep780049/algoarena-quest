@@ -391,8 +391,9 @@ export default function Admin() {
 
         <div className="flex flex-wrap gap-2 mb-8">
           <Button variant={activeTab === 'questions' ? 'default' : 'outline'} onClick={() => setActiveTab('questions')}><FileText className="h-4 w-4 mr-2" />Questions ({questions.length})</Button>
-          <Button variant={activeTab === 'contests' ? 'default' : 'outline'} onClick={() => setActiveTab('contests')}><Trophy className="h-4 w-4 mr-2" />Contests ({contests.length})</Button>
+          <Button variant={activeTab === 'contests' ? 'default' : 'outline'} onClick={() => setActiveTab('contests')}><Trophy className="h-4 w-4 mr-2" />Contests ({nonGateContests.length})</Button>
           <Button variant={activeTab === 'gate' ? 'default' : 'outline'} onClick={() => setActiveTab('gate')}><GraduationCap className="h-4 w-4 mr-2" />GATE Questions ({gateQuestions.length})</Button>
+          <Button variant={activeTab === 'gate-contests' ? 'default' : 'outline'} onClick={() => setActiveTab('gate-contests')}><Trophy className="h-4 w-4 mr-2" />GATE Contests ({gateContests.length})</Button>
         </div>
 
         {/* QUESTIONS TAB */}
