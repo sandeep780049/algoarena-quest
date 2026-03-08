@@ -431,7 +431,7 @@ export default function Admin() {
                 <div className="grid md:grid-cols-2 gap-4">
                   <div><Label>Name *</Label><Input value={contestName} onChange={e => setContestName(e.target.value)} /></div>
                   <div><Label>Code *</Label><Input value={contestCode} onChange={e => setContestCode(e.target.value)} placeholder="DAILY001" /></div>
-                  <div><Label>Type</Label><select value={contestType} onChange={e => setContestType(e.target.value as any)} className="w-full h-10 rounded-lg border border-border bg-background px-3"><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="special">Special</option><option value="gate">GATE</option></select></div>
+                  <div><Label>Type</Label><select value={contestType} onChange={e => setContestType(e.target.value as any)} className="w-full h-10 rounded-lg border border-border bg-background px-3"><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="special">Special</option></select></div>
                   <div><Label>Duration (min)</Label><Input type="number" value={duration} onChange={e => setDuration(Number(e.target.value))} /></div>
                   <div className="md:col-span-2"><Label>Start Time *</Label><Input type="datetime-local" value={startTime} onChange={e => setStartTime(e.target.value)} /></div>
                   <div className="md:col-span-2"><Label>Description</Label><Textarea value={contestDesc} onChange={e => setContestDesc(e.target.value)} /></div>
