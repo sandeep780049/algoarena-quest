@@ -193,33 +193,47 @@ export default function Quiz() {
         return;
       }
 
-      // SECURITY: Use secure RPC function with shuffled questions/options
-      const { data: questionsData, error: questionsError } = await supabase
-        .rpc('get_contest_questions', { p_contest_id: id });
+      // Fetch questions based on contest type
+      let formattedQuestions: QuizQuestion[];
+      
+      if (isGate) {
+        const { data: gateQData, error: gateQError } = await supabase
+          .rpc('get_gate_contest_questions', { p_contest_id: id });
+        
+        if (gateQError) throw new Error(gateQError.message);
+        if (!gateQData || !Array.isArray(gateQData) || gateQData.length === 0) {
+          toast({ title: 'No Questions', description: 'This contest has no questions.', variant: 'destructive' });
+          navigate(`/contest/${id}`);
+          return;
+        }
+        
+        formattedQuestions = (gateQData as any[]).map((q: any) => ({
+          id: q.id as string,
+          question_text: q.question_text as string,
+          code_block: q.code_block as string | null,
+          options: (Array.isArray(q.options) ? q.options : []) as string[],
+        }));
+      } else {
+        // SECURITY: Use secure RPC function with shuffled questions/options
+        const { data: questionsData, error: questionsError } = await supabase
+          .rpc('get_contest_questions', { p_contest_id: id });
 
-      if (questionsError) {
-        console.error('Error fetching questions:', questionsError);
-        throw new Error(questionsError.message);
+        if (questionsError) throw new Error(questionsError.message);
+        if (!questionsData || !Array.isArray(questionsData) || questionsData.length === 0) {
+          toast({ title: 'No Questions', description: 'This contest has no questions available.', variant: 'destructive' });
+          navigate(`/contest/${id}`);
+          return;
+        }
+        
+        formattedQuestions = questionsData.map((q) => ({
+          id: q.id as string,
+          question_text: q.question_text as string,
+          code_block: q.code_block as string | null,
+          options: (Array.isArray(q.options) ? q.options : []) as string[],
+          option_mapping: q.option_mapping as Record<string, string> | undefined,
+        }));
       }
       
-      if (!questionsData || !Array.isArray(questionsData) || questionsData.length === 0) {
-        console.error('No questions found for contest:', id);
-        toast({
-          title: 'No Questions',
-          description: 'This contest has no questions available.',
-          variant: 'destructive',
-        });
-        navigate(`/contest/${id}`);
-        return;
-      }
-      
-      const formattedQuestions: QuizQuestion[] = questionsData.map((q) => ({
-        id: q.id as string,
-        question_text: q.question_text as string,
-        code_block: q.code_block as string | null,
-        options: (Array.isArray(q.options) ? q.options : []) as string[],
-        option_mapping: q.option_mapping as Record<string, string> | undefined,
-      }));
       setQuestions(formattedQuestions);
 
       // Load existing answers from submissions (in case user refreshed)
