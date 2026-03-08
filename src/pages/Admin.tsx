@@ -202,10 +202,17 @@ export default function Admin() {
 
   const editContest = async (c: Contest) => {
     setEditingContest(c); setContestName(c.name); setContestDesc(c.description || '');
-    setContestType(c.contest_type); setContestCode(c.contest_code);
+    setContestType(c.contest_type as any); setContestCode(c.contest_code);
     setStartTime(format(new Date(c.start_time), "yyyy-MM-dd'T'HH:mm")); setDuration(c.duration_minutes);
-    const { data } = await supabase.from('contest_questions').select('question_id').eq('contest_id', c.id).order('order_index');
-    setSelectedQuestions(data?.map(d => d.question_id) || []);
+    if (c.contest_type === 'gate') {
+      const { data } = await supabase.from('gate_contest_questions' as any).select('question_id').eq('contest_id', c.id).order('order_index');
+      setSelectedGateQuestions((data as any)?.map((d: any) => d.question_id) || []);
+      setSelectedQuestions([]);
+    } else {
+      const { data } = await supabase.from('contest_questions').select('question_id').eq('contest_id', c.id).order('order_index');
+      setSelectedQuestions(data?.map(d => d.question_id) || []);
+      setSelectedGateQuestions([]);
+    }
     setShowContestForm(true);
   };
 
