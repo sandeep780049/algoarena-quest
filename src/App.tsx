@@ -21,6 +21,7 @@ import Certificate from "./pages/Certificate";
 import GatePractice from "./pages/GatePractice";
 import GateSubjectPractice from "./pages/GateSubjectPractice";
 import GatePracticeSession from "./pages/GatePracticeSession";
+import GateQuestionView from "./pages/GateQuestionView";
 
 const queryClient = new QueryClient();
 
