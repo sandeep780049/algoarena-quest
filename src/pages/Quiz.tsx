@@ -236,20 +236,29 @@ export default function Quiz() {
       
       setQuestions(formattedQuestions);
 
-      // Load existing answers from submissions (in case user refreshed)
       if (user) {
-        const { data: submissionsData } = await supabase
-          .from('submissions')
-          .select('question_id, selected_answer')
-          .eq('contest_id', id)
-          .eq('user_id', user.id);
-        
-        if (submissionsData) {
-          const savedAnswers: Record<string, number> = {};
-          submissionsData.forEach(sub => {
-            savedAnswers[sub.question_id] = sub.selected_answer;
-          });
-          setAnswers(savedAnswers);
+        if (isGate) {
+          const { data: gSubData } = await supabase
+            .from('gate_contest_submissions' as any)
+            .select('question_id, selected_answer')
+            .eq('contest_id', id)
+            .eq('user_id', user.id);
+          if (gSubData) {
+            const savedAnswers: Record<string, number> = {};
+            (gSubData as any[]).forEach((sub: any) => { savedAnswers[sub.question_id] = sub.selected_answer; });
+            setAnswers(savedAnswers);
+          }
+        } else {
+          const { data: submissionsData } = await supabase
+            .from('submissions')
+            .select('question_id, selected_answer')
+            .eq('contest_id', id)
+            .eq('user_id', user.id);
+          if (submissionsData) {
+            const savedAnswers: Record<string, number> = {};
+            submissionsData.forEach(sub => { savedAnswers[sub.question_id] = sub.selected_answer; });
+            setAnswers(savedAnswers);
+          }
         }
       }
 
