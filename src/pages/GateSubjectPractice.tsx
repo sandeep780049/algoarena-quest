@@ -300,31 +300,46 @@ export default function GateSubjectPractice() {
           </div>
         ) : (
           <div>
-            <h2 className="text-lg font-semibold mb-4">Questions ({filteredQuestions.length})</h2>
-            <div className="space-y-3">
-              {filteredQuestions.slice(0, 20).map((q, i) => (
-                <div key={q.id} className="bg-card border border-border rounded-lg p-4 flex items-start gap-4">
-                  <span className="text-sm font-mono text-muted-foreground w-8">{i + 1}.</span>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">{q.question_text}</p>
-                    <div className="flex items-center gap-2 mt-1">
-                      <Badge variant="outline" className={`text-xs ${
-                        q.difficulty === 'easy' ? 'text-green-400 border-green-400/30' :
-                        q.difficulty === 'hard' ? 'text-red-400 border-red-400/30' :
-                        'text-yellow-400 border-yellow-400/30'
-                      }`}>
-                        {q.difficulty}
-                      </Badge>
-                      {q.topic && <Badge variant="outline" className="text-xs">{q.topic}</Badge>}
-                    </div>
-                  </div>
-                </div>
-              ))}
-              {filteredQuestions.length > 20 && (
-                <p className="text-center text-sm text-muted-foreground py-2">
-                  +{filteredQuestions.length - 20} more questions
-                </p>
+            <h2 className="text-lg font-semibold mb-4">
+              Questions ({filteredQuestions.length})
+              {solvedIds.size > 0 && (
+                <span className="text-sm font-normal text-muted-foreground ml-2">
+                  · {filteredQuestions.filter(q => solvedIds.has(q.id)).length} solved
+                </span>
               )}
+            </h2>
+            <div className="space-y-2">
+              {filteredQuestions.map((q, i) => {
+                const isSolved = solvedIds.has(q.id);
+                return (
+                  <button
+                    key={q.id}
+                    onClick={() => navigate(`/gate-practice/${subjectId}/${q.id}`)}
+                    className={`w-full text-left bg-card border rounded-lg p-4 flex items-center gap-4 transition-all hover:border-primary/50 hover:shadow-md hover:shadow-primary/5 active:scale-[0.99] cursor-pointer ${
+                      isSolved ? 'border-primary/30' : 'border-border'
+                    }`}
+                  >
+                    <span className="text-sm font-mono text-muted-foreground w-8 shrink-0">{i + 1}.</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{q.question_text}</p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <Badge variant="outline" className={`text-xs ${
+                          q.difficulty === 'easy' ? 'text-green-400 border-green-400/30' :
+                          q.difficulty === 'hard' ? 'text-red-400 border-red-400/30' :
+                          'text-yellow-400 border-yellow-400/30'
+                        }`}>
+                          {q.difficulty}
+                        </Badge>
+                        {q.topic && <Badge variant="outline" className="text-xs">{q.topic}</Badge>}
+                      </div>
+                    </div>
+                    {isSolved && (
+                      <CheckCircle className="h-5 w-5 text-primary shrink-0" />
+                    )}
+                    <ArrowRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                  </button>
+                );
+              })}
             </div>
           </div>
         )}
