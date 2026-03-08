@@ -143,6 +143,63 @@ export default function Admin() {
     setGateCorrectAnswer(0); setGateExplanation(''); setEditingGateQ(null); setShowGateForm(false);
   };
 
+  const resetGateContestForm = () => {
+    setGcName(''); setGcCode(''); setGcSubject(''); setGcDuration(30);
+    setGcStartTime(''); setGcDesc(''); setGcDifficulty('medium');
+    setGcSelectedQuestions([]); setGcSubjectFilter('');
+    setEditingGateContest(null); setShowGateContestForm(false);
+  };
+
+  const gateContests = contests.filter(c => c.contest_type === 'gate');
+  const nonGateContests = contests.filter(c => c.contest_type !== 'gate');
+
+  const filteredGateQuestionsForContest = gateQuestions.filter(q => {
+    if (gcSubjectFilter && q.subject !== gcSubjectFilter) return false;
+    return true;
+  });
+
+  const saveGateContest = async () => {
+    if (!gcName.trim() || !gcCode.trim() || !gcStartTime) {
+      toast({ title: 'Validation Error', description: 'Fill all required fields.', variant: 'destructive' });
+      return;
+    }
+    const contestData = {
+      name: gcName, description: gcDesc || null, contest_type: 'gate' as const,
+      contest_code: gcCode, start_time: new Date(gcStartTime).toISOString(),
+      duration_minutes: gcDuration, created_by: user?.id,
+    };
+    let contestId = editingGateContest?.id;
+    if (editingGateContest) {
+      await supabase.from('contests').update(contestData).eq('id', editingGateContest.id);
+    } else {
+      const { data } = await supabase.from('contests').insert(contestData).select().single();
+      contestId = data?.id;
+    }
+    if (contestId && gcSelectedQuestions.length > 0) {
+      await supabase.from('gate_contest_questions' as any).delete().eq('contest_id', contestId);
+      const gcqData = gcSelectedQuestions.map((qId, idx) => ({ contest_id: contestId, question_id: qId, order_index: idx }));
+      await supabase.from('gate_contest_questions' as any).insert(gcqData);
+    }
+    toast({ title: 'Success', description: 'GATE Contest saved.' });
+    resetGateContestForm(); fetchData();
+  };
+
+  const editGateContest = async (c: Contest) => {
+    setEditingGateContest(c); setGcName(c.name); setGcCode(c.contest_code);
+    setGcDuration(c.duration_minutes); setGcDesc(c.description || '');
+    setGcStartTime(format(new Date(c.start_time), "yyyy-MM-dd'T'HH:mm"));
+    const { data } = await supabase.from('gate_contest_questions' as any).select('question_id').eq('contest_id', c.id).order('order_index');
+    setGcSelectedQuestions((data as any)?.map((d: any) => d.question_id) || []);
+    setShowGateContestForm(true);
+  };
+
+  const deleteGateContest = async (id: string) => {
+    if (!confirm('Delete this GATE contest? This will also remove all linked questions.')) return;
+    await supabase.from('gate_contest_questions' as any).delete().eq('contest_id', id);
+    await supabase.from('contests').delete().eq('id', id);
+    toast({ title: 'Deleted' }); fetchData();
+  };
+
   const saveQuestion = async () => {
     const validation = questionSchema.safeParse({
       questionText, codeBlock: codeBlock || undefined, options, correctAnswer, explanation: explanation || undefined,
