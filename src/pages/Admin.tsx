@@ -40,7 +40,7 @@ const contestSchema = z.object({
   contestName: z.string().trim().min(1, "Contest name is required").max(200, "Contest name must be under 200 characters"),
   contestDesc: z.string().max(1000, "Description must be under 1000 characters").optional(),
   contestCode: z.string().trim().min(1, "Contest code is required").max(50, "Contest code must be under 50 characters").regex(/^[A-Za-z0-9_-]+$/, "Contest code can only contain letters, numbers, hyphens, and underscores"),
-  contestType: z.enum(['daily', 'weekly', 'special']),
+  contestType: z.enum(['daily', 'weekly', 'special', 'gate']),
   startTime: z.string().min(1, "Start time is required"),
   duration: z.number().min(1, "Duration must be at least 1 minute").max(480, "Duration cannot exceed 8 hours"),
   selectedQuestions: z.array(z.string().uuid()).optional(),
@@ -50,7 +50,7 @@ export default function Admin() {
   const { user, isAdmin, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState<'questions' | 'contests' | 'gate'>('questions');
+  const [activeTab, setActiveTab] = useState<'questions' | 'contests' | 'gate' | 'gate-contests'>('questions');
   const [questions, setQuestions] = useState<Question[]>([]);
   const [contests, setContests] = useState<Contest[]>([]);
   const [gateQuestions, setGateQuestions] = useState<GateQuestion[]>([]);
@@ -72,7 +72,8 @@ export default function Admin() {
   // Contest form state
   const [contestName, setContestName] = useState('');
   const [contestDesc, setContestDesc] = useState('');
-  const [contestType, setContestType] = useState<'daily' | 'weekly' | 'special'>('daily');
+  const [contestType, setContestType] = useState<'daily' | 'weekly' | 'special' | 'gate'>('daily');
+  const [selectedGateQuestions, setSelectedGateQuestions] = useState<string[]>([]);
   const [contestCode, setContestCode] = useState('');
   const [startTime, setStartTime] = useState('');
   const [duration, setDuration] = useState(30);
@@ -121,7 +122,7 @@ export default function Admin() {
 
   const resetContestForm = () => {
     setContestName(''); setContestDesc(''); setContestType('daily'); setContestCode('');
-    setStartTime(''); setDuration(30); setSelectedQuestions([]); setEditingContest(null); setShowContestForm(false);
+    setStartTime(''); setDuration(30); setSelectedQuestions([]); setSelectedGateQuestions([]); setEditingContest(null); setShowContestForm(false);
   };
 
   const resetGateForm = () => {
@@ -171,7 +172,11 @@ export default function Admin() {
       const { data } = await supabase.from('contests').insert(contestData).select().single();
       contestId = data?.id;
     }
-    if (contestId && selectedQuestions.length > 0) {
+    if (contestId && contestType === 'gate' && selectedGateQuestions.length > 0) {
+      await supabase.from('gate_contest_questions' as any).delete().eq('contest_id', contestId);
+      const gcqData = selectedGateQuestions.map((qId, idx) => ({ contest_id: contestId, question_id: qId, order_index: idx }));
+      await supabase.from('gate_contest_questions' as any).insert(gcqData);
+    } else if (contestId && selectedQuestions.length > 0) {
       await supabase.from('contest_questions').delete().eq('contest_id', contestId);
       const cqData = selectedQuestions.map((qId, idx) => ({ contest_id: contestId, question_id: qId, order_index: idx }));
       await supabase.from('contest_questions').insert(cqData);
@@ -181,7 +186,10 @@ export default function Admin() {
   };
 
   const publishContest = async (contest: Contest) => {
-    const { data: cq } = await supabase.from('contest_questions').select('id').eq('contest_id', contest.id);
+    const isGate = contest.contest_type === 'gate';
+    const { data: cq } = isGate
+      ? await supabase.from('gate_contest_questions' as any).select('id').eq('contest_id', contest.id)
+      : await supabase.from('contest_questions').select('id').eq('contest_id', contest.id);
     if (!cq || cq.length === 0) {
       toast({ title: 'Error', description: 'Cannot publish contest without questions!', variant: 'destructive' }); return;
     }
@@ -197,10 +205,17 @@ export default function Admin() {
 
   const editContest = async (c: Contest) => {
     setEditingContest(c); setContestName(c.name); setContestDesc(c.description || '');
-    setContestType(c.contest_type); setContestCode(c.contest_code);
+    setContestType(c.contest_type as any); setContestCode(c.contest_code);
     setStartTime(format(new Date(c.start_time), "yyyy-MM-dd'T'HH:mm")); setDuration(c.duration_minutes);
-    const { data } = await supabase.from('contest_questions').select('question_id').eq('contest_id', c.id).order('order_index');
-    setSelectedQuestions(data?.map(d => d.question_id) || []);
+    if (c.contest_type === 'gate') {
+      const { data } = await supabase.from('gate_contest_questions' as any).select('question_id').eq('contest_id', c.id).order('order_index');
+      setSelectedGateQuestions((data as any)?.map((d: any) => d.question_id) || []);
+      setSelectedQuestions([]);
+    } else {
+      const { data } = await supabase.from('contest_questions').select('question_id').eq('contest_id', c.id).order('order_index');
+      setSelectedQuestions(data?.map(d => d.question_id) || []);
+      setSelectedGateQuestions([]);
+    }
     setShowContestForm(true);
   };
 
@@ -346,11 +361,19 @@ export default function Admin() {
                 <div className="grid md:grid-cols-2 gap-4">
                   <div><Label>Name *</Label><Input value={contestName} onChange={e => setContestName(e.target.value)} /></div>
                   <div><Label>Code *</Label><Input value={contestCode} onChange={e => setContestCode(e.target.value)} placeholder="DAILY001" /></div>
-                  <div><Label>Type</Label><select value={contestType} onChange={e => setContestType(e.target.value as any)} className="w-full h-10 rounded-lg border border-border bg-background px-3"><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="special">Special</option></select></div>
+                  <div><Label>Type</Label><select value={contestType} onChange={e => setContestType(e.target.value as any)} className="w-full h-10 rounded-lg border border-border bg-background px-3"><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="special">Special</option><option value="gate">GATE</option></select></div>
                   <div><Label>Duration (min)</Label><Input type="number" value={duration} onChange={e => setDuration(Number(e.target.value))} /></div>
                   <div className="md:col-span-2"><Label>Start Time *</Label><Input type="datetime-local" value={startTime} onChange={e => setStartTime(e.target.value)} /></div>
                   <div className="md:col-span-2"><Label>Description</Label><Textarea value={contestDesc} onChange={e => setContestDesc(e.target.value)} /></div>
-                  <div className="md:col-span-2"><Label>Questions ({selectedQuestions.length} selected)</Label><div className="max-h-48 overflow-y-auto border border-border rounded-lg p-2 space-y-2">{questions.map(q => (<label key={q.id} className="flex items-center gap-2 p-2 rounded hover:bg-secondary cursor-pointer"><input type="checkbox" checked={selectedQuestions.includes(q.id)} onChange={e => setSelectedQuestions(e.target.checked ? [...selectedQuestions, q.id] : selectedQuestions.filter(id => id !== q.id))} /><span className="text-sm truncate">{q.question_text}</span></label>))}</div></div>
+                  {contestType !== 'gate' && (
+                    <div className="md:col-span-2"><Label>Questions ({selectedQuestions.length} selected)</Label><div className="max-h-48 overflow-y-auto border border-border rounded-lg p-2 space-y-2">{questions.map(q => (<label key={q.id} className="flex items-center gap-2 p-2 rounded hover:bg-secondary cursor-pointer"><input type="checkbox" checked={selectedQuestions.includes(q.id)} onChange={e => setSelectedQuestions(e.target.checked ? [...selectedQuestions, q.id] : selectedQuestions.filter(id => id !== q.id))} /><span className="text-sm truncate">{q.question_text}</span></label>))}</div></div>
+                  )}
+                  {contestType === 'gate' && (
+                    <div className="md:col-span-2"><Label>GATE Questions ({selectedGateQuestions.length} selected)</Label><div className="max-h-48 overflow-y-auto border border-border rounded-lg p-2 space-y-2">{gateQuestions.map(q => {
+                      const subj = GATE_SUBJECTS.find(s => s.id === q.subject);
+                      return (<label key={q.id} className="flex items-center gap-2 p-2 rounded hover:bg-secondary cursor-pointer"><input type="checkbox" checked={selectedGateQuestions.includes(q.id)} onChange={e => setSelectedGateQuestions(e.target.checked ? [...selectedGateQuestions, q.id] : selectedGateQuestions.filter(id => id !== q.id))} /><Badge variant="outline" className="text-xs shrink-0">{subj?.shortName || q.subject}</Badge><span className="text-sm truncate">{q.question_text}</span></label>);
+                    })}</div></div>
+                  )}
                 </div>
                 <Button onClick={saveContest} className="mt-4"><Save className="h-4 w-4 mr-2" />Save Contest</Button>
               </div>

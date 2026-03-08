@@ -69,6 +69,7 @@ export default function Quiz() {
   const [quizResult, setQuizResult] = useState<QuizResult | null>(null);
   const [hasCompleted, setHasCompleted] = useState(false);
   const [showEarlySubmitDialog, setShowEarlySubmitDialog] = useState(false);
+  const [isGateContest, setIsGateContest] = useState(false);
   
   // Prevent double submission
   const isSubmittingRef = useRef(false);
@@ -162,7 +163,8 @@ export default function Quiz() {
 
       const contestTyped = contestData as Contest;
       setContest(contestTyped);
-
+      const isGate = contestTyped.contest_type === 'gate';
+      setIsGateContest(isGate);
       // Calculate actual contest status based on time (don't rely on stored status)
       // Keep frontend aligned with backend rules (includes 1-minute grace period after end).
       const startTime = new Date(contestTyped.start_time);
@@ -191,49 +193,72 @@ export default function Quiz() {
         return;
       }
 
-      // SECURITY: Use secure RPC function with shuffled questions/options
-      const { data: questionsData, error: questionsError } = await supabase
-        .rpc('get_contest_questions', { p_contest_id: id });
+      // Fetch questions based on contest type
+      let formattedQuestions: QuizQuestion[];
+      
+      if (isGate) {
+        const { data: gateQData, error: gateQError } = await supabase
+          .rpc('get_gate_contest_questions', { p_contest_id: id });
+        
+        if (gateQError) throw new Error(gateQError.message);
+        if (!gateQData || !Array.isArray(gateQData) || gateQData.length === 0) {
+          toast({ title: 'No Questions', description: 'This contest has no questions.', variant: 'destructive' });
+          navigate(`/contest/${id}`);
+          return;
+        }
+        
+        formattedQuestions = (gateQData as any[]).map((q: any) => ({
+          id: q.id as string,
+          question_text: q.question_text as string,
+          code_block: q.code_block as string | null,
+          options: (Array.isArray(q.options) ? q.options : []) as string[],
+        }));
+      } else {
+        // SECURITY: Use secure RPC function with shuffled questions/options
+        const { data: questionsData, error: questionsError } = await supabase
+          .rpc('get_contest_questions', { p_contest_id: id });
 
-      if (questionsError) {
-        console.error('Error fetching questions:', questionsError);
-        throw new Error(questionsError.message);
+        if (questionsError) throw new Error(questionsError.message);
+        if (!questionsData || !Array.isArray(questionsData) || questionsData.length === 0) {
+          toast({ title: 'No Questions', description: 'This contest has no questions available.', variant: 'destructive' });
+          navigate(`/contest/${id}`);
+          return;
+        }
+        
+        formattedQuestions = questionsData.map((q) => ({
+          id: q.id as string,
+          question_text: q.question_text as string,
+          code_block: q.code_block as string | null,
+          options: (Array.isArray(q.options) ? q.options : []) as string[],
+          option_mapping: q.option_mapping as Record<string, string> | undefined,
+        }));
       }
       
-      if (!questionsData || !Array.isArray(questionsData) || questionsData.length === 0) {
-        console.error('No questions found for contest:', id);
-        toast({
-          title: 'No Questions',
-          description: 'This contest has no questions available.',
-          variant: 'destructive',
-        });
-        navigate(`/contest/${id}`);
-        return;
-      }
-      
-      const formattedQuestions: QuizQuestion[] = questionsData.map((q) => ({
-        id: q.id as string,
-        question_text: q.question_text as string,
-        code_block: q.code_block as string | null,
-        options: (Array.isArray(q.options) ? q.options : []) as string[],
-        option_mapping: q.option_mapping as Record<string, string> | undefined,
-      }));
       setQuestions(formattedQuestions);
 
-      // Load existing answers from submissions (in case user refreshed)
       if (user) {
-        const { data: submissionsData } = await supabase
-          .from('submissions')
-          .select('question_id, selected_answer')
-          .eq('contest_id', id)
-          .eq('user_id', user.id);
-        
-        if (submissionsData) {
-          const savedAnswers: Record<string, number> = {};
-          submissionsData.forEach(sub => {
-            savedAnswers[sub.question_id] = sub.selected_answer;
-          });
-          setAnswers(savedAnswers);
+        if (isGate) {
+          const { data: gSubData } = await supabase
+            .from('gate_contest_submissions' as any)
+            .select('question_id, selected_answer')
+            .eq('contest_id', id)
+            .eq('user_id', user.id);
+          if (gSubData) {
+            const savedAnswers: Record<string, number> = {};
+            (gSubData as any[]).forEach((sub: any) => { savedAnswers[sub.question_id] = sub.selected_answer; });
+            setAnswers(savedAnswers);
+          }
+        } else {
+          const { data: submissionsData } = await supabase
+            .from('submissions')
+            .select('question_id, selected_answer')
+            .eq('contest_id', id)
+            .eq('user_id', user.id);
+          if (submissionsData) {
+            const savedAnswers: Record<string, number> = {};
+            submissionsData.forEach(sub => { savedAnswers[sub.question_id] = sub.selected_answer; });
+            setAnswers(savedAnswers);
+          }
         }
       }
 
@@ -254,25 +279,15 @@ export default function Quiz() {
 
   const saveAnswer = async (questionId: string, answerIndex: number | null) => {
     if (!user || !contest) return;
-
-    // Validate answer index is within valid range (0-3 for 4 options) or null for deselect
-    if (answerIndex !== null && (answerIndex < 0 || answerIndex > 3)) {
-      console.error('Invalid answer index:', answerIndex);
-      return;
-    }
+    if (answerIndex !== null && (answerIndex < 0 || answerIndex > 3)) return;
 
     try {
-      const { data, error } = await supabase.rpc('save_quiz_answer', {
+      const rpcName = isGateContest ? 'save_gate_quiz_answer' : 'save_quiz_answer';
+      await supabase.rpc(rpcName as any, {
         p_contest_id: contest.id,
         p_question_id: questionId,
-        p_selected_answer: answerIndex ?? -1 // Use -1 to signal deletion
+        p_selected_answer: answerIndex ?? -1
       });
-      
-      if (error) {
-        console.error('Error saving answer:', error);
-        // Don't show toast for save errors - it's auto-save
-        // The submission will handle the actual scoring
-      }
     } catch (error) {
       console.error('Error saving answer:', error);
     }
@@ -308,33 +323,21 @@ export default function Quiz() {
     setSubmitting(true);
 
     try {
-      // Retry once on transient/network failures
       let responseData: unknown = null;
       let lastError: unknown = null;
+      const rpcName = isGateContest ? 'submit_gate_quiz_answers' : 'submit_quiz_answers';
 
       for (let attempt = 0; attempt < 2; attempt++) {
-        const { data, error } = await supabase.rpc('submit_quiz_answers', {
+        const { data, error } = await supabase.rpc(rpcName as any, {
           p_contest_id: contest.id,
           p_answers: answers,
           p_started_at: startedAt?.toISOString() || new Date().toISOString(),
         });
 
-        if (!error) {
-          responseData = data;
-          lastError = null;
-          break;
-        }
-
+        if (!error) { responseData = data; lastError = null; break; }
         lastError = error;
         const msg = (error as { message?: string })?.message || '';
-        const isTransient =
-          msg.includes('Failed to fetch') ||
-          msg.includes('NetworkError') ||
-          msg.includes('timeout') ||
-          msg.includes('502') ||
-          msg.includes('503') ||
-          msg.includes('504');
-
+        const isTransient = msg.includes('Failed to fetch') || msg.includes('NetworkError') || msg.includes('timeout') || msg.includes('502') || msg.includes('503') || msg.includes('504');
         if (!isTransient || attempt === 1) break;
         await new Promise((r) => setTimeout(r, 600));
       }
