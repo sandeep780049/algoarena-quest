@@ -72,7 +72,8 @@ export default function Admin() {
   // Contest form state
   const [contestName, setContestName] = useState('');
   const [contestDesc, setContestDesc] = useState('');
-  const [contestType, setContestType] = useState<'daily' | 'weekly' | 'special'>('daily');
+  const [contestType, setContestType] = useState<'daily' | 'weekly' | 'special' | 'gate'>('daily');
+  const [selectedGateQuestions, setSelectedGateQuestions] = useState<string[]>([]);
   const [contestCode, setContestCode] = useState('');
   const [startTime, setStartTime] = useState('');
   const [duration, setDuration] = useState(30);
