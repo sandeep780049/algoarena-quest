@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Layout } from '@/components/Layout';
 import { SEO } from '@/components/SEO';
@@ -26,7 +26,9 @@ import {
   Target,
   TrendingUp,
   FileText,
-  Timer
+  Timer,
+  Home,
+  Braces,
 } from 'lucide-react';
 import { format, addMinutes, formatDistanceToNow } from 'date-fns';
 
@@ -114,6 +116,8 @@ function ContestCard({ contest }: { contest: ContestWithCount }) {
   );
 }
 
+type NavTab = 'home' | 'gate-prep' | 'gate-contests' | 'code-output';
+
 export default function Index() {
   const { user, isAdmin } = useAuth();
   const navigate = useNavigate();
@@ -125,12 +129,59 @@ export default function Index() {
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({ questions: 0, users: 0, contests: 0, gateQuestions: 0 });
   const [subjectCounts, setSubjectCounts] = useState<Record<string, number>>({});
+  const [activeTab, setActiveTab] = useState<NavTab>('home');
+
+  const heroRef = useRef<HTMLDivElement>(null);
+  const gatePrepRef = useRef<HTMLDivElement>(null);
+  const gateContestsRef = useRef<HTMLDivElement>(null);
+  const codeOutputRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     fetchContests();
     fetchStats();
     fetchSubjectCounts();
   }, []);
+
+  // Intersection observer for active tab tracking
+  useEffect(() => {
+    const sections = [
+      { ref: heroRef, tab: 'home' as NavTab },
+      { ref: gatePrepRef, tab: 'gate-prep' as NavTab },
+      { ref: gateContestsRef, tab: 'gate-contests' as NavTab },
+      { ref: codeOutputRef, tab: 'code-output' as NavTab },
+    ];
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries.filter(e => e.isIntersecting);
+        if (visible.length > 0) {
+          const topEntry = visible.reduce((a, b) => 
+            a.boundingClientRect.top < b.boundingClientRect.top ? a : b
+          );
+          const match = sections.find(s => s.ref.current === topEntry.target);
+          if (match) setActiveTab(match.tab);
+        }
+      },
+      { threshold: 0.3, rootMargin: '-80px 0px -40% 0px' }
+    );
+
+    sections.forEach(s => {
+      if (s.ref.current) observer.observe(s.ref.current);
+    });
+
+    return () => observer.disconnect();
+  }, []);
+
+  const scrollTo = (tab: NavTab) => {
+    const refMap: Record<NavTab, React.RefObject<HTMLDivElement | null>> = {
+      home: heroRef,
+      'gate-prep': gatePrepRef,
+      'gate-contests': gateContestsRef,
+      'code-output': codeOutputRef,
+    };
+    refMap[tab].current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    setActiveTab(tab);
+  };
 
   const fetchStats = async () => {
     const [questionsRes, usersRes, contestsRes, gateRes] = await Promise.all([
@@ -229,6 +280,13 @@ export default function Index() {
     { icon: Award, title: 'Certificates', description: 'Earn certificates of achievement after completing GATE contests.' },
   ];
 
+  const navTabs: { id: NavTab; label: string; icon: React.ElementType }[] = [
+    { id: 'home', label: 'Home', icon: Home },
+    { id: 'gate-prep', label: 'GATE Prep', icon: GraduationCap },
+    { id: 'gate-contests', label: 'GATE Contests', icon: Trophy },
+    { id: 'code-output', label: 'Code Output Contests', icon: Braces },
+  ];
+
   return (
     <Layout>
       <SEO 
@@ -236,8 +294,38 @@ export default function Index() {
         description="JC AlgoArena - The ultimate coding quiz platform. Test your programming knowledge, compete in live contests, and climb the leaderboard."
         path="/"
       />
+
+      {/* Sticky Sub-Navigation */}
+      <nav className="sticky top-16 z-40 border-b border-border/50 bg-background/60 backdrop-blur-xl">
+        <div className="container mx-auto px-4">
+          <div className="flex items-center gap-1 py-2 overflow-x-auto scrollbar-thin scrollbar-thumb-border no-scrollbar">
+            {navTabs.map((tab) => {
+              const isActive = activeTab === tab.id;
+              const TabIcon = tab.icon;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => scrollTo(tab.id)}
+                  className={`relative flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-medium whitespace-nowrap transition-all duration-300 shrink-0 ${
+                    isActive
+                      ? 'bg-primary/15 text-primary shadow-[0_0_15px_hsl(var(--primary)/0.3)]'
+                      : 'text-muted-foreground hover:text-primary hover:bg-primary/5'
+                  }`}
+                >
+                  <TabIcon className={`h-4 w-4 transition-transform duration-300 ${isActive ? 'scale-110' : ''}`} />
+                  {tab.label}
+                  {isActive && (
+                    <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-8 h-0.5 rounded-full bg-primary" />
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </nav>
+
       {/* Hero Section */}
-      <section className="relative overflow-hidden">
+      <section ref={heroRef} id="section-home" className="relative overflow-hidden scroll-mt-28">
         <div className="pointer-events-none absolute inset-0 bg-hero-gradient opacity-50" />
         <div className="pointer-events-none absolute inset-0 bg-dots opacity-30" />
         
@@ -341,7 +429,7 @@ export default function Index() {
       {/* ═══════════════════════════════════════════════════════════ */}
       {/* GATE CSE Preparation Section */}
       {/* ═══════════════════════════════════════════════════════════ */}
-      <section className="py-16 relative overflow-hidden">
+      <section ref={gatePrepRef} id="section-gate-prep" className="py-16 relative overflow-hidden scroll-mt-28">
         <div className="pointer-events-none absolute inset-0 bg-grid opacity-[0.03]" />
         <div className="container mx-auto px-4 relative">
           {/* Section Header */}
@@ -402,29 +490,37 @@ export default function Index() {
       </section>
 
       {/* GATE Contests Section */}
-      {gateContests.length > 0 && (
-        <section className="py-12 bg-secondary/30 border-y border-border">
-          <div className="container mx-auto px-4">
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center gap-3">
-                <GraduationCap className="h-6 w-6 text-glow-success" />
-                <h2 className="text-2xl font-bold">GATE Contests</h2>
+      <section ref={gateContestsRef} id="section-gate-contests" className="py-12 bg-secondary/30 border-y border-border scroll-mt-28">
+        <div className="container mx-auto px-4">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-3">
+              <GraduationCap className="h-6 w-6 text-glow-success" />
+              <h2 className="text-2xl font-bold">GATE Contests</h2>
+              {gateContests.length > 0 && (
                 <Badge className="bg-glow-success/20 text-glow-success border-glow-success/30">
                   {gateContests.length} available
                 </Badge>
-              </div>
-              <Link to="/contests">
-                <Button variant="ghost" size="sm">View All <ChevronRight className="h-4 w-4 ml-1" /></Button>
-              </Link>
+              )}
             </div>
+            <Link to="/contests">
+              <Button variant="ghost" size="sm">View All <ChevronRight className="h-4 w-4 ml-1" /></Button>
+            </Link>
+          </div>
+          {gateContests.length > 0 ? (
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
               {gateContests.map(contest => (
                 <ContestCard key={contest.id} contest={contest} />
               ))}
             </div>
-          </div>
-        </section>
-      )}
+          ) : (
+            <div className="text-center py-10 rounded-xl bg-card border border-border">
+              <GraduationCap className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
+              <p className="text-muted-foreground">No active GATE contests right now.</p>
+              <Link to="/contests" className="text-primary hover:underline text-sm mt-1 inline-block">Browse all contests</Link>
+            </div>
+          )}
+        </div>
+      </section>
 
       {/* GATE Features Section */}
       <section className="py-16 bg-card/50">
@@ -458,6 +554,96 @@ export default function Index() {
         </div>
       </section>
 
+      {/* ═══════════════════════════════════════════════════════════ */}
+      {/* Code Output Contests Section */}
+      {/* ═══════════════════════════════════════════════════════════ */}
+      <section ref={codeOutputRef} id="section-code-output" className="py-16 relative overflow-hidden scroll-mt-28">
+        <div className="pointer-events-none absolute inset-0 bg-grid opacity-[0.03]" />
+        <div className="container mx-auto px-4 relative">
+          <div className="text-center mb-10">
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20 text-primary text-sm font-medium mb-4">
+              <Braces className="h-4 w-4" />
+              <span>Predict &amp; Compete</span>
+            </div>
+            <h2 className="text-3xl md:text-4xl font-bold mb-4">
+              Code Output <span className="text-gradient">Contests</span>
+            </h2>
+            <p className="text-muted-foreground max-w-2xl mx-auto">
+              Predict the output of code snippets and test your programming logic.
+            </p>
+          </div>
+
+          {/* Glowing feature card */}
+          <div className="max-w-3xl mx-auto mb-10">
+            <div className="relative group p-8 rounded-2xl bg-card border border-border hover:border-primary/40 transition-all duration-500">
+              <div className="absolute -inset-px rounded-2xl bg-gradient-to-r from-primary/20 via-accent/10 to-primary/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500 blur-sm" />
+              <div className="relative flex flex-col md:flex-row items-center gap-6">
+                <div className="w-16 h-16 rounded-xl bg-primary/10 flex items-center justify-center shrink-0 group-hover:shadow-[0_0_20px_hsl(var(--primary)/0.3)] transition-shadow duration-500">
+                  <Code2 className="h-8 w-8 text-primary" />
+                </div>
+                <div className="text-center md:text-left">
+                  <h3 className="text-xl font-bold mb-2">Sharpen Your Programming Logic</h3>
+                  <p className="text-muted-foreground">
+                    Sharpen your programming logic by predicting outputs of tricky code snippets. 
+                    Compete in daily and weekly contests, climb the leaderboard, and earn certificates.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Contest cards for non-gate contests */}
+          {(dailyContests.length > 0 || weeklyContests.length > 0) && (
+            <div className="grid lg:grid-cols-2 gap-8 mb-10">
+              {dailyContests.length > 0 && (
+                <div>
+                  <div className="flex items-center gap-3 mb-4">
+                    <Zap className="h-5 w-5 text-primary" />
+                    <h3 className="text-xl font-bold">Daily Challenges</h3>
+                  </div>
+                  <div className="space-y-3">
+                    {dailyContests.map(contest => (
+                      <ContestCard key={contest.id} contest={contest} />
+                    ))}
+                  </div>
+                </div>
+              )}
+              {weeklyContests.length > 0 && (
+                <div>
+                  <div className="flex items-center gap-3 mb-4">
+                    <Trophy className="h-5 w-5 text-accent" />
+                    <h3 className="text-xl font-bold">Weekly Competitions</h3>
+                  </div>
+                  <div className="space-y-3">
+                    {weeklyContests.map(contest => (
+                      <ContestCard key={contest.id} contest={contest} />
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {dailyContests.length === 0 && weeklyContests.length === 0 && !loading && (
+            <div className="text-center py-10 mb-10 rounded-xl bg-card border border-border">
+              <Braces className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
+              <p className="text-muted-foreground">No active code output contests right now.</p>
+              <Link to="/contests" className="text-primary hover:underline text-sm mt-1 inline-block">Browse all contests</Link>
+            </div>
+          )}
+
+          <div className="text-center">
+            <Button asChild variant="hero" size="xl" className="glow-primary">
+              <Link to="/contests">
+                <Code2 className="h-5 w-5 mr-2" />
+                Start Practicing
+                <ChevronRight className="h-5 w-5 ml-1" />
+              </Link>
+            </Button>
+          </div>
+        </div>
+      </section>
+
       {/* Upcoming Contests */}
       {upcomingContests.length > 0 && (
         <section className="py-12">
@@ -479,47 +665,6 @@ export default function Index() {
           </div>
         </section>
       )}
-
-      {/* Daily & Weekly Contests */}
-      <section className="py-12 bg-secondary/30">
-        <div className="container mx-auto px-4">
-          <div className="grid lg:grid-cols-2 gap-8">
-            {dailyContests.length > 0 && (
-              <div>
-                <div className="flex items-center gap-3 mb-6">
-                  <Zap className="h-5 w-5 text-primary" />
-                  <h3 className="text-xl font-bold">Daily Challenges</h3>
-                </div>
-                <div className="space-y-3">
-                  {dailyContests.map(contest => (
-                    <ContestCard key={contest.id} contest={contest} />
-                  ))}
-                </div>
-              </div>
-            )}
-            {weeklyContests.length > 0 && (
-              <div>
-                <div className="flex items-center gap-3 mb-6">
-                  <Trophy className="h-5 w-5 text-accent" />
-                  <h3 className="text-xl font-bold">Weekly Competitions</h3>
-                </div>
-                <div className="space-y-3">
-                  {weeklyContests.map(contest => (
-                    <ContestCard key={contest.id} contest={contest} />
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-          {dailyContests.length === 0 && weeklyContests.length === 0 && !loading && (
-            <div className="text-center py-12">
-              <Trophy className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              <p className="text-muted-foreground">No active contests at the moment.</p>
-              <Link to="/contests" className="text-primary hover:underline text-sm">View all contests</Link>
-            </div>
-          )}
-        </div>
-      </section>
 
       {/* Features Section */}
       <section className="py-16">

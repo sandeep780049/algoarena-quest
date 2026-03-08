@@ -223,3 +223,12 @@
 .anti-cheat-active {
   -webkit-touch-callout: none;
 }
+
+/* Hide scrollbar utility */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
