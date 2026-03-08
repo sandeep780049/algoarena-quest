@@ -63,10 +63,11 @@ function ContestCard({ contest, showRegistration = true }: { contest: ContestWit
   const config = statusConfig[status];
   const StatusIcon = config.icon;
 
-  const typeColors = {
+  const typeColors: Record<string, string> = {
     daily: 'bg-primary/20 text-primary',
     weekly: 'bg-accent/20 text-accent',
     special: 'bg-glow-warning/20 text-glow-warning',
+    gate: 'bg-emerald-500/20 text-emerald-400',
   };
 
   return (
