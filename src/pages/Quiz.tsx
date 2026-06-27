@@ -245,8 +245,7 @@ export default function Quiz() {
     if (answerIndex !== null && (answerIndex < 0 || answerIndex > 3)) return;
 
     try {
-      const rpcName = isGateContest ? 'save_gate_quiz_answer' : 'save_quiz_answer';
-      await supabase.rpc(rpcName as any, {
+      await supabase.rpc('save_quiz_answer', {
         p_contest_id: contest.id,
         p_question_id: questionId,
         p_selected_answer: answerIndex ?? -1
@@ -288,10 +287,8 @@ export default function Quiz() {
     try {
       let responseData: unknown = null;
       let lastError: unknown = null;
-      const rpcName = isGateContest ? 'submit_gate_quiz_answers' : 'submit_quiz_answers';
-
       for (let attempt = 0; attempt < 2; attempt++) {
-        const { data, error } = await supabase.rpc(rpcName as any, {
+        const { data, error } = await supabase.rpc('submit_quiz_answers', {
           p_contest_id: contest.id,
           p_answers: answers,
           p_started_at: startedAt?.toISOString() || new Date().toISOString(),
