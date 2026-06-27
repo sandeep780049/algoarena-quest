@@ -417,7 +417,7 @@ export default function Leaderboard() {
             >
               Global
             </Button>
-            {contests.filter(c => c.contest_type !== 'gate').slice(0, 5).map((contest) => (
+            {contests.slice(0, 5).map((contest) => (
               <Button
                 key={contest.id}
                 variant={selectedContest === contest.id ? 'default' : 'outline'}
@@ -428,25 +428,6 @@ export default function Leaderboard() {
               </Button>
             ))}
           </div>
-          {/* GATE Contests */}
-          {contests.some(c => c.contest_type === 'gate') && (
-            <div className="mt-3">
-              <p className="text-xs text-muted-foreground mb-2 font-medium uppercase tracking-wider">GATE Contests</p>
-              <div className="flex flex-wrap gap-2">
-                {contests.filter(c => c.contest_type === 'gate').slice(0, 5).map((contest) => (
-                  <Button
-                    key={contest.id}
-                    variant={selectedContest === contest.id ? 'default' : 'outline'}
-                    size="sm"
-                    className={selectedContest === contest.id ? '' : 'border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10'}
-                    onClick={() => setSelectedContest(contest.id)}
-                  >
-                    🎓 {contest.name}
-                  </Button>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
 
         {/* Contest Locked Notice */}

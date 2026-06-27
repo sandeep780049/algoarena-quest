@@ -5,7 +5,7 @@ export { supabase };
 // Types for database
 export type AppRole = 'admin' | 'user';
 export type ContestStatus = 'upcoming' | 'live' | 'ended';
-export type ContestType = 'daily' | 'weekly' | 'special' | 'gate';
+export type ContestType = 'daily' | 'weekly' | 'special';
 
 export interface Profile {
   id: string;

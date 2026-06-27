@@ -118,40 +118,25 @@ export default function ContestDetail() {
 
       setContest(contestData as Contest);
 
-      // Fetch questions count based on contest type
-      const isGate = (contestData as Contest).contest_type === 'gate';
-      
-      if (isGate) {
-        const { data: gcqData } = await supabase
-          .from('gate_contest_questions' as any)
-          .select('question_id, order_index')
-          .eq('contest_id', id)
-          .order('order_index');
+      // Fetch questions
+      const { data: cqData } = await supabase
+        .from('contest_questions')
+        .select('question_id, order_index')
+        .eq('contest_id', id)
+        .order('order_index');
 
-        if (gcqData && gcqData.length > 0) {
-          // Just set empty question shells for count display
-          setQuestions(gcqData.map((cq: any) => ({ id: cq.question_id, question_text: '', code_block: null, options: [], correct_answer: 0, explanation: null, difficulty: '', tags: [], created_by: null, created_at: '', updated_at: '' })) as Question[]);
-        }
-      } else {
-        const { data: cqData } = await supabase
-          .from('contest_questions')
-          .select('question_id, order_index')
-          .eq('contest_id', id)
-          .order('order_index');
+      if (cqData && cqData.length > 0) {
+        const questionIds = cqData.map(cq => cq.question_id);
+        const { data: questionsData } = await supabase
+          .from('questions')
+          .select('*')
+          .in('id', questionIds);
 
-        if (cqData && cqData.length > 0) {
-          const questionIds = cqData.map(cq => cq.question_id);
-          const { data: questionsData } = await supabase
-            .from('questions')
-            .select('*')
-            .in('id', questionIds);
-          
-          if (questionsData) {
-            const sortedQuestions = questionIds.map(qid => 
-              questionsData.find(q => q.id === qid)
-            ).filter(Boolean) as Question[];
-            setQuestions(sortedQuestions);
-          }
+        if (questionsData) {
+          const sortedQuestions = questionIds.map(qid =>
+            questionsData.find(q => q.id === qid)
+          ).filter(Boolean) as Question[];
+          setQuestions(sortedQuestions);
         }
       }
 

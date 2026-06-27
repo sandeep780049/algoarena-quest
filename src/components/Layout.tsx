@@ -12,7 +12,7 @@ import {
   X,
   Home,
   Code2,
-  GraduationCap,
+  
 } from 'lucide-react';
 
 interface LayoutProps {
@@ -51,7 +51,6 @@ export function Layout({ children }: LayoutProps) {
 
   const navItems = [
     { href: '/', label: 'Home', icon: Home },
-    { href: '/gate-practice', label: 'GATE Practice', icon: GraduationCap },
     { href: '/contests', label: 'Contests', icon: Trophy },
     { href: '/leaderboard', label: 'Leaderboard', icon: Code2 },
   ];
